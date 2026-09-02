@@ -1,0 +1,52 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: #f7faf9; color: #12312d; }
+a { color: #0f766e; }
+.shell { max-width: 860px; margin: 0 auto; padding: 16px; }
+header { display: flex; gap: 18px; align-items: center; padding: 12px 0; border-bottom: 1px solid #d8e6e2; margin-bottom: 20px; }
+header a { text-decoration: none; font-weight: 600; }
+.warn { color: #b45309; font-size: 13px; }
+h1 { font-size: 26px; margin: 8px 0; }
+h2 { font-size: 18px; }
+.sub { color: #4a6b66; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
+.card { background: #fff; border: 1px solid #d8e6e2; border-radius: 12px; padding: 16px; box-shadow: 0 1px 2px rgba(18, 49, 45, 0.05); }
+.card.empty { grid-column: 1 / -1; }
+.card-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.badge { font-size: 12px; padding: 2px 10px; border-radius: 999px; }
+.badge.healthy { background: #d1fae5; color: #065f46; }
+.badge.drifted { background: #fef3c7; color: #92400e; }
+.badge.never_run { background: #e5e7eb; color: #374151; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+button { border: 1px solid #cbd5d1; background: #fff; color: #12312d; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+button.primary { background: #0f766e; border-color: #0f766e; color: #fff; }
+button.deny { color: #b91c1c; border-color: #f3c8c8; }
+input, select { width: 100%; padding: 9px 10px; border: 1px solid #cbd5d1; border-radius: 8px; font-size: 15px; background: #fff; }
+.field { display: block; margin: 10px 0; }
+.field span { display: block; font-size: 13px; margin-bottom: 4px; color: #33554f; }
+.site-wrap { max-width: 560px; margin: 0 auto; }
+.site-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.version-switch a { margin-left: 8px; text-decoration: none; font-size: 13px; padding: 3px 8px; border-radius: 6px; }
+.version-switch a.on { background: #0f766e; color: #fff; }
+.banner { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; padding: 10px 14px; border-radius: 10px; margin-bottom: 14px; font-weight: 600; }
+.teach-badge { background: #fee2e2; color: #991b1b; padding: 8px 12px; border-radius: 8px; font-weight: 600; margin-bottom: 12px; }
+.agent-note { background: #e0f2fe; color: #075985; padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; }
+.flash { background: #d1fae5; color: #065f46; padding: 10px 12px; border-radius: 8px; margin-bottom: 12px; font-weight: 600; }
+.wizard { background: #fff; border: 1px solid #d8e6e2; border-radius: 14px; padding: 20px; transition: box-shadow 0.3s; }
+.wizard.highlight { box-shadow: 0 0 0 3px #0f766e; }
+.steps-bar { display: flex; gap: 6px; margin-bottom: 12px; }
+.steps-bar span { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: #e5e7eb; color: #6b7280; font-size: 13px; font-weight: 700; }
+.steps-bar span.on { background: #0f766e; color: #fff; }
+.steps-bar span.done { background: #99f6e4; color: #134e4a; }
+.modal-backdrop { position: fixed; inset: 0; background: rgba(18, 49, 45, 0.45); display: grid; place-items: center; z-index: 50; padding: 16px; }
+.modal { background: #fff; border-radius: 14px; padding: 22px; max-width: 460px; width: 100%; max-height: 85vh; overflow: auto; }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px; }
+.param-row { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
+.param-row input { width: auto; }
+.changes { padding-left: 18px; }
+.changes li { margin: 6px 0; }
+.tag { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 6px; }
+.tag.auto, .tag.teach, .tag.run, .tag.heal, .tag.confirm { background: #d1fae5; color: #065f46; }
+.tag.ask, .tag.drift, .tag.delete { background: #fef3c7; color: #92400e; }
+.audit { margin-top: 32px; border-top: 1px solid #d8e6e2; padding-top: 12px; }
+.audit ul { padding-left: 18px; }
+.audit li { margin: 5px 0; }
