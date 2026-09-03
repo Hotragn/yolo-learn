@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { fieldName, FieldSpec, getActiveSiteModel, siteHash, slugify } from "./types"
+import { fieldName, FieldSpec, getActiveSiteModel, siteHash, slugify, syncSiteVersion } from "./types"
 import { valueForField } from "./drift"
 import { setRunExecutor, setSiteReset, RunResult } from "./runner"
 import { learnCurrentSite } from "./learn"
@@ -499,7 +499,14 @@ export default function SiteApp() {
 function RecallPanel({ learning, onLearn }: { learning: boolean; onLearn: () => void }) {
   const [recall, setRecall] = useState(recallForPage)
   useEffect(() => {
-    const refresh = () => setRecall(recallForPage())
+    const refresh = () => {
+      // Child effects register before parent effects, so this hashchange
+      // listener runs before App's does. Without syncing first, a switch to
+      // ?v=2 would recall against the previous version and report a hit on a
+      // page that had just changed.
+      syncSiteVersion()
+      setRecall(recallForPage())
+    }
     refresh()
     const offStore = subscribe(refresh)
     window.addEventListener("hashchange", refresh)
