@@ -50,11 +50,11 @@
     --ink: #f7f8f8;
     --ink-soft: #9b9fa4;
     --ink-faint: #74787d;
-    --surface: #121314;
-    --surface-2: #17191a;
+    --surface: #16181a;
+    --surface-2: #1c1f21;
     --page: #08090a;
-    --border: #232527;
-    --border-strong: #323538;
+    --border: #2b2e31;
+    --border-strong: #3d4146;
 
     --accent: #8ee61b;
     --accent-ink: #b6f45c;
@@ -80,11 +80,11 @@
   --ink: #f7f8f8;
   --ink-soft: #9b9fa4;
   --ink-faint: #74787d;
-  --surface: #121314;
-  --surface-2: #17191a;
+  --surface: #16181a;
+  --surface-2: #1c1f21;
   --page: #08090a;
-  --border: #232527;
-  --border-strong: #323538;
+  --border: #2b2e31;
+  --border-strong: #3d4146;
   --accent: #8ee61b;
   --accent-ink: #b6f45c;
   --accent-wash: #1b2a12;
@@ -221,11 +221,11 @@ h1 {
   text-wrap: balance;
 }
 h2 {
-  font-size: 21px;
-  font-weight: 500;
-  line-height: 1.2;
-  letter-spacing: -0.02em;
-  margin: 34px 0 10px;
+  font-size: 30px;
+  font-weight: 450;
+  line-height: 1.12;
+  letter-spacing: -0.028em;
+  margin: 60px 0 14px;
 }
 h3 { font-size: 17px; font-weight: 550; margin: 0 0 10px; letter-spacing: -0.015em; }
 .sub { color: var(--ink-soft); margin: 6px 0 18px; max-width: 62ch; }
@@ -998,3 +998,113 @@ button:tool-submit-active { box-shadow: 0 0 0 3px var(--accent-wash); }
 }
 .resumed svg { flex: none; margin-top: 2px; }
 .resumed b { color: var(--accent-ink); }
+
+/* --- product tour ----------------------------------------------------- */
+/* Four veil panels around the target instead of one overlay with a hole, so
+   the spotlit element stays fully lit and still clickable. */
+.tour { position: absolute; inset: 0; z-index: 80; }
+.tour-veil {
+  position: absolute;
+  background: rgba(4, 6, 8, 0.72);
+  pointer-events: auto;
+}
+.tour-ring {
+  position: absolute;
+  border: 2px solid var(--accent);
+  border-radius: 10px;
+  box-shadow: 0 0 0 4px var(--accent-wash);
+  pointer-events: none;
+  transition: top 0.22s ease, left 0.22s ease, width 0.22s ease, height 0.22s ease;
+}
+.tour-card {
+  position: absolute;
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 16px 18px 14px;
+  box-shadow: var(--shadow-lg);
+  outline: none;
+}
+.tour-card.above { transform: translateY(-100%); }
+.tour-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+}
+.tour-head svg { color: var(--accent-ink); }
+.tour-skip {
+  margin-left: auto;
+  border: 0;
+  background: none;
+  color: var(--ink-faint);
+  font-size: 12px;
+  padding: 2px 4px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.tour-skip:hover { color: var(--ink); }
+.tour-card h3 { margin: 10px 0 6px; font-size: 17px; letter-spacing: -0.015em; }
+.tour-card p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--ink-soft); }
+.tour-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+.tour-actions button { display: inline-flex; align-items: center; gap: 6px; }
+.tour-keys {
+  margin-top: 10px !important;
+  font-size: 11.5px !important;
+  color: var(--ink-faint) !important;
+}
+.tour-launch {
+  padding: 6px 12px;
+  font-size: 13px;
+  border-radius: 999px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tour-ring { transition: none; }
+}
+
+/* --- hierarchy and rhythm --------------------------------------------- */
+/* The page was a single column of identically-sized rounded cards, which is
+   the layout-repetition the taste guidance warns about: nothing to anchor a
+   skim. These give the sections different weights and let them breathe. */
+
+main > section,
+main > .cards,
+main > .stack {
+  margin-bottom: 12px;
+}
+
+h2 + .sub {
+  font-size: 16.5px;
+  max-width: 62ch;
+  margin-top: -4px;
+  margin-bottom: 20px;
+}
+
+/* A section heading gets a hairline above it, so the eye finds the seams
+   without another box being drawn around everything. */
+main > h2 {
+  padding-top: 26px;
+  border-top: 1px solid var(--border);
+}
+main > h2:first-of-type {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.card {
+  transition: border-color 0.16s ease, transform 0.16s ease;
+}
+.card:hover {
+  border-color: var(--border-strong);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card { transition: none; }
+}

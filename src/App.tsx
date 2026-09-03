@@ -30,6 +30,7 @@ import { TeachProvider } from "./TeachMode"
 import { AgentConsole } from "./AgentConsole"
 import { Modal } from "./Modal"
 import SiteApp from "./SiteApp"
+import { hasSeenTour, markTourSeen, Tour } from "./Tour"
 import {
   IconAlert,
   IconArrowRight,
@@ -39,6 +40,10 @@ import {
   IconMint,
   IconMoon,
   IconRead,
+  IconNoInvent,
+  IconNoKey,
+  IconNoSend,
+  IconNoSubmit,
   IconRefuse,
   IconRemember,
   IconRun,
@@ -98,6 +103,17 @@ export default function App() {
   const { path } = useHashRoute()
   const theme = useTheme()
   const [seeding, setSeeding] = useState<DemoSeed | null>(null)
+  const [tour, setTour] = useState(false)
+
+  // First visit gets the walkthrough, once. A reviewer landing cold has no
+  // idea what "Flows" or "Tools" mean, and the interface should say so itself
+  // rather than making them read the README first.
+  useEffect(() => {
+    if (hasSeenTour()) return
+    if (location.hash.includes("demo=")) return markTourSeen()
+    const t = setTimeout(() => setTour(true), 700)
+    return () => clearTimeout(t)
+  }, [])
 
   // Deep links so any beat of the story is one click away. A reviewer who
   // abandons the loop halfway would otherwise never reach the payoff.
@@ -135,7 +151,7 @@ export default function App() {
     <TeachProvider>
       <div className="shell">
         <header>
-          <a className="brand" href="#/">
+          <a className="brand" href="#/" data-tour="brand">
             <Logo size={28} />
             <span className="brand-name">
               Yolo <span>Learn</span>
@@ -145,18 +161,21 @@ export default function App() {
             <a href="#/" aria-current={path === "/"}>
               Get started
             </a>
-            <a href="#/flows" aria-current={path === "/flows"}>
+            <a href="#/flows" aria-current={path === "/flows"} data-tour="nav-flows">
               Flows
             </a>
-            <a href="#/site" aria-current={path === "/site"}>
+            <a href="#/site" aria-current={path === "/site"} data-tour="nav-site">
               Demo site
             </a>
-            <a href="#/tools" aria-current={path === "/tools"}>
+            <a href="#/tools" aria-current={path === "/tools"} data-tour="nav-tools">
               Tools
             </a>
           </nav>
           <div className="head-right">
             <SiteVersionPill />
+            <button className="tour-launch" onClick={() => setTour(true)} title="Take the tour">
+              Tour
+            </button>
             <button
               className="theme-toggle"
               onClick={theme.cycle}
@@ -172,7 +191,7 @@ export default function App() {
         <GuidedDock />
 
         {seeding && (
-          <p className="detect ok">
+          <p className="detect ok" data-tour="detect">
             <IconRead size={16} />
             <span>Setting up the "{seeding}" state by actually learning the page. One moment.</span>
           </p>
@@ -189,6 +208,8 @@ export default function App() {
         )}
 
         <AgentConsole />
+
+        {tour && <Tour onClose={() => setTour(false)} />}
 
         <footer className="foot">
           <span>
@@ -226,7 +247,7 @@ function WebmcpBanner() {
 
   if (status.available && status.originIsolated && !status.lastError) {
     return (
-      <p className="detect ok">
+      <p className="detect ok" data-tour="detect">
         <IconCheck size={16} />
         <span>
           WebMCP detected on <code>{status.entryPoint}.modelContext</code>. {status.nativeCount} tool(s) registered with
@@ -237,7 +258,7 @@ function WebmcpBanner() {
   }
   if (status.available && !status.originIsolated) {
     return (
-      <p className="detect bad">
+      <p className="detect bad" data-tour="detect">
         <IconAlert size={16} />
         <span>
           WebMCP is present but this document is not origin-keyed, so registration is refused. The page must be served
@@ -247,7 +268,7 @@ function WebmcpBanner() {
     )
   }
   return (
-    <p className="detect warn">
+    <p className="detect warn" data-tour="detect">
       <IconAlert size={16} />
       <span>
         No WebMCP agent in this browser. Enable <code>chrome://flags/#enable-webmcp-testing</code> in Chrome 149+, or
@@ -291,7 +312,7 @@ function Onboarding() {
           redesigned.
         </p>
         <div className="hero-actions">
-          <a className="cta" href="#/site">
+          <a className="cta" href="#/site" data-tour="learn">
             <IconRead size={18} />
             Let it learn the demo site
           </a>
@@ -383,7 +404,7 @@ function Onboarding() {
       <dl className="wont">
         <div>
           <dt>
-            <IconRefuse size={17} /> Submit without you
+            <IconNoSubmit size={17} /> Submit without you
           </dt>
           <dd>
             Every run stops at an approval dialog listing the exact values. Deny it, press Escape, or navigate away and
@@ -392,7 +413,7 @@ function Onboarding() {
         </div>
         <div>
           <dt>
-            <IconRefuse size={17} /> Invent your details
+            <IconNoInvent size={17} /> Invent your details
           </dt>
           <dd>
             It stores the shape of a task, not values. If the site asks for something nobody has ever supplied, it asks
@@ -401,7 +422,7 @@ function Onboarding() {
         </div>
         <div>
           <dt>
-            <IconRefuse size={17} /> Touch a password or a card
+            <IconNoKey size={17} /> Touch a password or a card
           </dt>
           <dd>
             Credential and payment fields are refused while learning. If a step is nothing but a sign-in wall, it stops
@@ -410,7 +431,7 @@ function Onboarding() {
         </div>
         <div>
           <dt>
-            <IconRefuse size={17} /> Send anything anywhere
+            <IconNoSend size={17} /> Send anything anywhere
           </dt>
           <dd>
             Single origin, <code>localStorage</code> only. No backend, no accounts, no telemetry. The clinic is
@@ -448,7 +469,7 @@ function GuidedPanel() {
   const g = useGuided()
   return (
     <section className={"guided" + (g.running ? " running" : "")}>
-      <div className="guided-head">
+      <div className="guided-head" data-tour="guided">
         <div>
           <b>Watch the whole thing run</b>
           <span>

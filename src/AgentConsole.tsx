@@ -93,7 +93,7 @@ export function AgentConsole() {
   const builtIns = entries.filter((e) => !e.flowId)
 
   return (
-    <section className={"console" + (open ? " open" : "")} aria-label="Simulated agent console">
+    <section className={"console" + (open ? " open" : "")} aria-label="Simulated agent console" data-tour="console">
       <button className="console-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
         <span>Simulated agent {open ? "▾" : "▸"}</span>
         <small>
