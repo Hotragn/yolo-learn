@@ -1,5 +1,8 @@
 export type FieldType = "text" | "date" | "time" | "select" | "tel"
 
+/** Hard cap on any value we accept from an agent. Tool args are untrusted input. */
+export const MAX_VALUE_LEN = 200
+
 export interface FieldSpec {
   purpose: string
   label: string
@@ -22,13 +25,14 @@ export interface SiteModel {
 }
 
 const TIME_OPTIONS = ["9:00 AM", "10:00 AM", "11:00 AM", "1:00 PM", "2:00 PM", "3:00 PM", "4:00 PM"]
+const SERVICE_OPTIONS = ["checkup", "dental cleaning", "physical exam"]
 
 export const SITE_V1: SiteModel = {
   version: "1.0",
   changelog: [],
   steps: [
     { order: 1, intent: "choose service", fields: [
-      { purpose: "service type", label: "Service", type: "select", options: ["checkup", "dental cleaning", "physical exam"], required: true },
+      { purpose: "service type", label: "Service", type: "select", options: SERVICE_OPTIONS, required: true },
     ], submitLabel: "Next" },
     { order: 2, intent: "pick date and time", fields: [
       { purpose: "date", label: "Preferred date", type: "date", required: true },
@@ -56,7 +60,7 @@ export const SITE_V2: SiteModel = {
       { purpose: "time", label: "Preferred time", type: "select", options: TIME_OPTIONS, required: true },
     ], submitLabel: "Next" },
     { order: 2, intent: "choose service", fields: [
-      { purpose: "service type", label: "Service", type: "select", options: ["checkup", "dental cleaning", "physical exam"], required: true },
+      { purpose: "service type", label: "Service", type: "select", options: SERVICE_OPTIONS, required: true },
     ], submitLabel: "Next" },
     { order: 3, intent: "enter patient details", fields: [
       { purpose: "patient name", label: "Full name (as on insurance card)", type: "text", required: true },
@@ -67,16 +71,76 @@ export const SITE_V2: SiteModel = {
   ],
 }
 
-export function getActiveSiteModel(): SiteModel {
-  const qs = location.hash.split("?")[1] ?? ""
-  return new URLSearchParams(qs).get("v") === "2" ? SITE_V2 : SITE_V1
+// --- localStorage helpers. Private-mode Safari and disabled-storage throw. ---
+
+export function safeGetItem(key: string): string | null {
+  try { return localStorage.getItem(key) } catch { return null }
 }
+
+export function safeSetItem(key: string, value: string): boolean {
+  try { localStorage.setItem(key, value) ; return true } catch { return false }
+}
+
+// --- active site version -------------------------------------------------
+// Deriving the version from location.hash alone is wrong: the Flow Library
+// lives at "#/" with no ?v= param, so drift would always be measured against
+// v1 no matter which version the user is actually looking at. The URL sets the
+// version; the choice is then remembered for every route.
+
+export type SiteVersion = "1.0" | "2.0"
+const VERSION_KEY = "siteVersion.v1"
+let activeVersion: SiteVersion = "1.0"
+
+function versionFromLocation(): SiteVersion | null {
+  if (typeof location === "undefined") return null
+  const qs = location.hash.split("?")[1] ?? ""
+  const v = new URLSearchParams(qs).get("v")
+  if (v === "2" || v === "2.0") return "2.0"
+  if (v === "1" || v === "1.0") return "1.0"
+  return null
+}
+
+/** Reconcile the active version with the URL. Returns true when it changed. */
+export function syncSiteVersion(): boolean {
+  const next = versionFromLocation() ?? (safeGetItem(VERSION_KEY) === "2.0" ? "2.0" : "1.0")
+  if (next === activeVersion) return false
+  activeVersion = next
+  safeSetItem(VERSION_KEY, next)
+  return true
+}
+
+export function setSiteVersion(v: SiteVersion) {
+  activeVersion = v
+  safeSetItem(VERSION_KEY, v)
+}
+
+export function getActiveSiteVersion(): SiteVersion { return activeVersion }
+
+export function getActiveSiteModel(): SiteModel {
+  return activeVersion === "2.0" ? SITE_V2 : SITE_V1
+}
+
+/** Site route that carries the active version, so a run never silently downgrades to v1. */
+export function siteHash(extra?: string): string {
+  const v = activeVersion === "2.0" ? "2" : "1"
+  return `#/site?v=${v}${extra ? "&" + extra : ""}`
+}
+
+if (typeof location !== "undefined") syncSiteVersion()
+
+// --- taught flows --------------------------------------------------------
 
 export interface FlowParam {
   key: string
   label: string
   type: "string" | "date"
   sourceField: { stepIntent: string; fieldPurpose: string }
+}
+
+export interface RunRecord {
+  at: string
+  ok: boolean
+  message: string
 }
 
 export interface TaughtFlow {
@@ -93,9 +157,17 @@ export interface TaughtFlow {
   runCount: number
   lastRunAt: string | null
   lastHealedAt: string | null
+  runs?: RunRecord[]
 }
 
-export type ChangeType = "RENAMED" | "NEW_FIELD" | "REMOVED_FIELD" | "REORDERED" | "WORDING" | "REMOVED_STEP"
+export type ChangeType =
+  | "RENAMED"
+  | "NEW_FIELD"
+  | "REMOVED_FIELD"
+  | "REORDERED"
+  | "WORDING"
+  | "REMOVED_STEP"
+  | "NEW_STEP"
 
 export interface DriftChange {
   type: ChangeType
@@ -106,14 +178,18 @@ export interface DriftChange {
 export interface DriftQuestion {
   id: string
   purpose: string
+  label: string
   question: string
 }
 
 export interface DriftReport {
   status: "healthy" | "drifted"
+  summary: string
   changes: DriftChange[]
   questions: DriftQuestion[]
 }
+
+// --- naming --------------------------------------------------------------
 
 export function slugify(s: string): string {
   return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "")
@@ -122,4 +198,23 @@ export function slugify(s: string): string {
 export function camel(s: string): string {
   const words = s.split(/[^a-zA-Z0-9]+/).filter(Boolean)
   return words.map((w, i) => (i === 0 ? w.toLowerCase() : w[0].toUpperCase() + w.slice(1).toLowerCase())).join("")
+}
+
+/** A WebMCP tool name must be unique: registerTool rejects duplicates. */
+export function uniqueName(base: string, taken: string[]): string {
+  const slug = slugify(base) || "my_flow"
+  if (!taken.includes(slug)) return slug
+  for (let n = 2; n < 1000; n++) {
+    const candidate = `${slug}_${n}`
+    if (!taken.includes(candidate)) return candidate
+  }
+  return `${slug}_${Date.now()}`
+}
+
+/** Form control name, used by the declarative WebMCP attributes. */
+export function fieldName(purpose: string): string { return slugify(purpose) }
+
+/** Clamp and stringify anything an agent hands us. */
+export function coerceValue(v: unknown): string {
+  return String(v ?? "").slice(0, MAX_VALUE_LEN)
 }

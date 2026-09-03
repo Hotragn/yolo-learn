@@ -1,36 +1,70 @@
-import { TaughtFlow } from "./types"
+import { safeGetItem, safeSetItem, TaughtFlow } from "./types"
 
 const FLOWS_KEY = "flows.v1"
 const AUDIT_KEY = "audit.v1"
 
 export interface AuditEvent {
   at: string
-  type: "teach" | "run" | "drift" | "heal" | "confirm" | "delete"
+  type: "teach" | "mint" | "run" | "drift" | "heal" | "confirm" | "delete"
   detail: string
 }
 
 type Listener = () => void
 const listeners = new Set<Listener>()
 
-function emit() { listeners.forEach((l) => l()) }
+// Writes can happen while listeners are running (a listener that repairs flow
+// status calls upsertFlow). Coalesce those into one notification instead of
+// recursing through every subscriber again.
+let emitting = false
+let emitQueued = false
+
+function emit() {
+  if (emitting) { emitQueued = true; return }
+  emitting = true
+  try {
+    do {
+      emitQueued = false
+      for (const l of [...listeners]) {
+        try { l() } catch (err) { console.error("store listener failed", err) }
+      }
+    } while (emitQueued)
+  } finally {
+    emitting = false
+  }
+}
 
 export function subscribe(l: Listener): () => void {
   listeners.add(l)
-  return () => listeners.delete(l)
+  return () => { listeners.delete(l) }
 }
 
 export function loadFlows(): TaughtFlow[] {
-  try { return JSON.parse(localStorage.getItem(FLOWS_KEY) ?? "[]") as TaughtFlow[] }
-  catch { return [] }
+  try {
+    const parsed = JSON.parse(safeGetItem(FLOWS_KEY) ?? "[]")
+    return Array.isArray(parsed) ? (parsed as TaughtFlow[]).filter(isFlow) : []
+  } catch {
+    return []
+  }
+}
+
+// A cold load reads whatever is in localStorage, which may be from an older
+// build or hand-edited. Drop anything that would crash the UI.
+function isFlow(f: unknown): f is TaughtFlow {
+  const o = f as Partial<TaughtFlow>
+  return !!o && typeof o.id === "string" && typeof o.name === "string" && Array.isArray(o.steps) && Array.isArray(o.params)
 }
 
 export function saveFlows(flows: TaughtFlow[]) {
-  localStorage.setItem(FLOWS_KEY, JSON.stringify(flows))
+  safeSetItem(FLOWS_KEY, JSON.stringify(flows))
   emit()
 }
 
 export function getFlow(id: string): TaughtFlow | undefined {
   return loadFlows().find((f) => f.id === id)
+}
+
+export function flowNames(): string[] {
+  return loadFlows().map((f) => f.name)
 }
 
 export function upsertFlow(flow: TaughtFlow) {
@@ -41,18 +75,65 @@ export function upsertFlow(flow: TaughtFlow) {
   saveFlows(flows)
 }
 
-export function deleteFlow(id: string) {
-  saveFlows(loadFlows().filter((f) => f.id !== id))
+/**
+ * Patch a flow in place. Returns undefined when the flow is gone (deleted
+ * mid-run), so callers never resurrect a deleted flow by spreading undefined.
+ */
+export function patchFlow(id: string, patch: Partial<TaughtFlow>): TaughtFlow | undefined {
+  const flows = loadFlows()
+  const i = flows.findIndex((f) => f.id === id)
+  if (i < 0) return undefined
+  const next = { ...flows[i], ...patch }
+  flows[i] = next
+  saveFlows(flows)
+  return next
+}
+
+/** Rewrite every flow in one pass, one write, one notification. */
+export function updateFlows(fn: (f: TaughtFlow) => TaughtFlow): TaughtFlow[] {
+  const flows = loadFlows()
+  const next = flows.map(fn)
+  const changed = next.some((f, i) => f !== flows[i])
+  if (changed) saveFlows(next)
+  return next
+}
+
+export interface DeletedFlow { flow: TaughtFlow; index: number }
+
+export function deleteFlow(id: string): DeletedFlow | null {
+  const flows = loadFlows()
+  const index = flows.findIndex((f) => f.id === id)
+  if (index < 0) return null
+  const [flow] = flows.splice(index, 1)
+  saveFlows(flows)
+  return { flow, index }
+}
+
+export function restoreFlow(deleted: DeletedFlow) {
+  const flows = loadFlows()
+  if (flows.some((f) => f.id === deleted.flow.id)) return
+  flows.splice(Math.min(deleted.index, flows.length), 0, deleted.flow)
+  saveFlows(flows)
 }
 
 export function logEvent(type: AuditEvent["type"], detail: string) {
   const events = getAudit()
   events.unshift({ at: new Date().toISOString(), type, detail })
-  localStorage.setItem(AUDIT_KEY, JSON.stringify(events.slice(0, 100)))
+  safeSetItem(AUDIT_KEY, JSON.stringify(events.slice(0, 100)))
   emit()
 }
 
 export function getAudit(): AuditEvent[] {
-  try { return JSON.parse(localStorage.getItem(AUDIT_KEY) ?? "[]") as AuditEvent[] }
-  catch { return [] }
+  try {
+    const parsed = JSON.parse(safeGetItem(AUDIT_KEY) ?? "[]")
+    return Array.isArray(parsed) ? (parsed as AuditEvent[]) : []
+  } catch {
+    return []
+  }
+}
+
+export function clearAll() {
+  safeSetItem(FLOWS_KEY, "[]")
+  safeSetItem(AUDIT_KEY, "[]")
+  emit()
 }
