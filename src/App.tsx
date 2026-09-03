@@ -32,18 +32,18 @@ import SiteApp from "./SiteApp"
 import {
   IconAlert,
   IconArrowRight,
-  IconAuto,
   IconCheck,
   IconCopy,
   IconHeal,
+  IconMint,
   IconMoon,
-  IconPlay,
-  IconShield,
-  IconSteps,
+  IconRead,
+  IconRefuse,
+  IconRemember,
+  IconRun,
   IconSun,
   IconSystem,
   IconTerminal,
-  IconTool,
   IconTrash,
   IconUndo,
   Logo,
@@ -166,7 +166,7 @@ export default function App() {
 
         <footer className="foot">
           <span>
-            {PRODUCT} — fictional clinic, local-only storage, no backend. Every submit is approved by you.
+            {PRODUCT} - fictional clinic, local-only storage, no backend. Every submit is approved by you.
           </span>
           <span>
             Built by{" "}
@@ -259,15 +259,14 @@ function Onboarding() {
     <main>
       <section className="hero">
         <p className="eyebrow">OpenAI WebMCP Challenge</p>
-        <h1>Agents forget every session, and break when the web changes.</h1>
+        <h1>Agents break when the web changes.</h1>
         <p className="hero-lead">
-          <b>{PRODUCT}</b> learns a task on a site — by reading the page itself, or by watching you do it once — and
-          mints a WebMCP tool for it live, mid-session. When the site is redesigned a year later, it reports exactly
-          what changed, asks at most one question, heals, and runs green.
+          <b>{PRODUCT}</b> reads a site, mints a WebMCP tool for the task, and heals itself when the site is
+          redesigned.
         </p>
         <div className="hero-actions">
           <a className="cta" href="#/site">
-            <IconAuto size={18} />
+            <IconRead size={18} />
             Let it learn the demo site
           </a>
           <a className="ghost-link" href="#/site?teach=1">
@@ -277,32 +276,33 @@ function Onboarding() {
       </section>
 
       <h2 className="section-head">
-        <IconSteps size={17} /> How it works
+        <IconRead size={17} /> How it works
       </h2>
       <div className="how">
-        <div className="how-step">
-          <div className="n">1</div>
-          <b>It learns the task</b>
+        <div className="how-step lead">
+          <IconRead size={22} />
+          <b>It reads the page</b>
           <p>
-            Autonomously, by reading labels, field names, required flags and option lists straight out of the DOM. No
-            demonstration needed for a simple site. You can still demonstrate it if you want your own values replayed.
+            Labels, field names, required flags and option lists, straight out of the DOM. Nothing is demonstrated and
+            nothing is invented: it learns the shape of the task and stores no values of its own.
+          </p>
+          <p className="how-aside">
+            Credential and payment fields are refused outright, never read and never filled.
           </p>
         </div>
-        <div className="how-step">
-          <div className="n">2</div>
-          <b>A tool appears mid-session</b>
-          <p>
-            <code>document.modelContext.registerTool()</code> is called on the spot. Your agent can call the new tool
-            immediately, with no reload — that is the part of WebMCP nobody demos.
-          </p>
-        </div>
-        <div className="how-step">
-          <div className="n">3</div>
-          <b>It survives the redesign</b>
-          <p>
-            Steps are remembered by intent and fields by purpose, never by CSS selector. Renames, reorders, removals and
-            reworded buttons heal themselves.
-          </p>
+        <div className="how-rest">
+          <div className="how-step">
+            <IconMint size={20} />
+            <b>A tool appears mid-session</b>
+            <p>
+              <code>registerTool()</code> is called on the spot, so an agent can call the new tool with no reload.
+            </p>
+          </div>
+          <div className="how-step">
+            <IconHeal size={20} />
+            <b>It survives the redesign</b>
+            <p>Steps are remembered by intent and fields by purpose, never by CSS selector.</p>
+          </div>
         </div>
       </div>
 
@@ -342,7 +342,7 @@ function Onboarding() {
           note={
             healed
               ? "Done. It survived the redesign with one answer."
-              : `Switch the demo site to v2 — the same clinic a year later — then check the flow's health. Site is on v${site.version} now.`
+              : `Switch the demo site to v2 - the same clinic a year later - then check the flow's health. Site is on v${site.version} now.`
           }
           href="#/site?v=2"
           cta="Switch to v2"
@@ -350,37 +350,46 @@ function Onboarding() {
       </ol>
 
       <h2 className="section-head">
-        <IconShield size={17} /> What it will not do
+        <IconRefuse size={17} /> What it will not do
       </h2>
-      <div className="support">
-        <div className="support-card">
-          <b>
-            <IconShield size={16} /> Submit without you
-          </b>
-          <p>
-            Every run stops at an approval dialog listing the exact values. Deny, press Escape, or navigate away and
+      <dl className="wont">
+        <div>
+          <dt>
+            <IconRefuse size={17} /> Submit without you
+          </dt>
+          <dd>
+            Every run stops at an approval dialog listing the exact values. Deny it, press Escape, or navigate away and
             nothing is sent.
-          </p>
+          </dd>
         </div>
-        <div className="support-card">
-          <b>
-            <IconAuto size={16} /> Invent your details
-          </b>
-          <p>
-            Autonomous learning stores the shape of the task and no values. If the site asks for something nobody has
-            ever supplied, it asks — once — instead of guessing.
-          </p>
+        <div>
+          <dt>
+            <IconRefuse size={17} /> Invent your details
+          </dt>
+          <dd>
+            It stores the shape of a task, not values. If the site asks for something nobody has ever supplied, it asks
+            once instead of guessing.
+          </dd>
         </div>
-        <div className="support-card">
-          <b>
-            <IconTerminal size={16} /> Send your data anywhere
-          </b>
-          <p>
-            Single origin, hash routing, <code>localStorage</code> only. No backend, no accounts, no telemetry. The
-            clinic is fictional.
-          </p>
+        <div>
+          <dt>
+            <IconRefuse size={17} /> Touch a password or a card
+          </dt>
+          <dd>
+            Credential and payment fields are refused while learning. If a step is nothing but a sign-in wall, it stops
+            and tells you to sign in first.
+          </dd>
         </div>
-      </div>
+        <div>
+          <dt>
+            <IconRefuse size={17} /> Send anything anywhere
+          </dt>
+          <dd>
+            Single origin, <code>localStorage</code> only. No backend, no accounts, no telemetry. The clinic is
+            fictional and no booking is real.
+          </dd>
+        </div>
+      </dl>
 
       {taught && (
         <div className="row" style={{ marginTop: 26 }}>
@@ -497,12 +506,12 @@ function Library() {
           <div className="card empty">
             <b>No flows yet.</b>
             <p className="sub">
-              The fastest way to see this work is to let it learn the demo site by itself — it reads the form and mints
+              The fastest way to see this work is to let it learn the demo site by itself - it reads the form and mints
               a tool without you filling anything in.
             </p>
             <div className="row">
               <a className="cta" href="#/site">
-                <IconAuto size={18} />
+                <IconRead size={18} />
                 Learn the demo site
               </a>
               <a className="ghost-link" href="#/site?teach=1">
@@ -559,7 +568,7 @@ function FlowCard({
         <span className="badges">
           {flow.learnedBy === "autonomous" && (
             <span className="badge auto" title="Learned by reading the page, with no demonstration">
-              <IconAuto size={12} /> auto-learned
+              <IconRead size={12} /> auto-learned
             </span>
           )}
           <span className={"badge " + flow.status}>{flow.status.replace("_", " ")}</span>
@@ -625,7 +634,7 @@ function FlowCard({
 
       <div className="row">
         <button className="primary" onClick={onRun}>
-          <IconPlay size={16} />
+          <IconRun size={16} />
           Run with agent
         </button>
         {report.status === "drifted" && (
@@ -725,7 +734,7 @@ function RunDialog({ flowId, onDone }: { flowId: string; onDone: () => void }) {
       <div className="modal-actions">
         <button onClick={onDone}>Cancel</button>
         <button className="primary" data-autofocus="true" onClick={go} disabled={missingRequired.length > 0}>
-          <IconPlay size={16} />
+          <IconRun size={16} />
           Run it
         </button>
       </div>
@@ -822,7 +831,7 @@ function ToolsView() {
     <main>
       {fresh && minted && (
         <div className="mint-flash" role="status">
-          <IconAuto className="spark" size={22} />
+          <IconMint className="spark" size={22} />
           <div>
             <b>{minted.name}</b>
             <p>
@@ -843,7 +852,7 @@ function ToolsView() {
       </p>
 
       <h2 className="section-head">
-        <IconAuto size={17} /> From learned flows
+        <IconRemember size={17} /> From learned flows
       </h2>
       <div className="cards">
         {flowTools.length === 0 && (
@@ -852,7 +861,7 @@ function ToolsView() {
             <p className="sub">Learn a flow and a tool appears here instantly.</p>
             <div className="row">
               <a className="cta" href="#/site">
-                <IconAuto size={18} /> Learn the demo site
+                <IconRead size={18} /> Learn the demo site
               </a>
             </div>
           </div>
@@ -863,7 +872,7 @@ function ToolsView() {
       </div>
 
       <h2 className="section-head">
-        <IconTool size={17} /> Built in
+        <IconMint size={17} /> Built in
       </h2>
       <div className="cards">
         {builtIns.map((e) => (

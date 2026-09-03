@@ -30,10 +30,13 @@
   --bad-wash: #fdecea;
   --bad-edge: #f3c4c0;
 
+  --sans: "Geist Variable", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --mono: "Geist Mono Variable", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
   --radius: 12px;
   --radius-sm: 8px;
   --shadow: 0 1px 2px rgba(11, 18, 32, 0.06), 0 8px 24px -18px rgba(11, 18, 32, 0.35);
-  --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  --mono-legacy: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Mono", Menlo, Consolas, monospace;
 
   --logo-bg: #0b1220;
   --logo-ring: #f4f6f9;
@@ -44,14 +47,14 @@
   :root:not([data-theme="light"]) {
     color-scheme: dark;
 
-    --ink: #e8edf5;
-    --ink-soft: #9aa7bd;
-    --ink-faint: #78849a;
-    --surface: #131c2b;
-    --surface-2: #182234;
-    --page: #0b1220;
-    --border: #253247;
-    --border-strong: #33425c;
+    --ink: #f7f8f8;
+    --ink-soft: #9b9fa4;
+    --ink-faint: #74787d;
+    --surface: #121314;
+    --surface-2: #17191a;
+    --page: #08090a;
+    --border: #232527;
+    --border-strong: #323538;
 
     --accent: #8ee61b;
     --accent-ink: #b6f45c;
@@ -67,21 +70,21 @@
     --bad-edge: #522723;
 
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px -20px rgba(0, 0, 0, 0.8);
-    --logo-bg: #1d2a3d;
-    --logo-ring: #e8edf5;
+    --logo-bg: #1c1e20;
+    --logo-ring: #f7f8f8;
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --ink: #e8edf5;
-  --ink-soft: #9aa7bd;
-  --ink-faint: #78849a;
-  --surface: #131c2b;
-  --surface-2: #182234;
-  --page: #0b1220;
-  --border: #253247;
-  --border-strong: #33425c;
+  --ink: #f7f8f8;
+  --ink-soft: #9b9fa4;
+  --ink-faint: #74787d;
+  --surface: #121314;
+  --surface-2: #17191a;
+  --page: #08090a;
+  --border: #232527;
+  --border-strong: #323538;
   --accent: #8ee61b;
   --accent-ink: #b6f45c;
   --accent-wash: #1b2a12;
@@ -94,8 +97,8 @@
   --bad-wash: #2b1614;
   --bad-edge: #522723;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px -20px rgba(0, 0, 0, 0.8);
-  --logo-bg: #1d2a3d;
-  --logo-ring: #e8edf5;
+  --logo-bg: #1c1e20;
+  --logo-ring: #f7f8f8;
 }
 
 * { box-sizing: border-box; }
@@ -104,9 +107,10 @@ html { -webkit-text-size-adjust: 100%; }
 
 body {
   margin: 0;
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, sans-serif;
+  font-family: var(--sans);
   font-size: 16px;
   line-height: 1.55;
+  font-feature-settings: "cv11" 1;
   background: var(--page);
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
@@ -203,9 +207,27 @@ header nav a[aria-current="true"] { background: var(--ink); color: var(--page); 
 /* --- type --------------------------------------------------------------- */
 
 main { padding-top: 6px; }
-h1 { font-size: 30px; line-height: 1.15; margin: 24px 0 8px; letter-spacing: -0.025em; }
-h2 { font-size: 19px; margin: 30px 0 10px; letter-spacing: -0.01em; }
-h3 { font-size: 17px; margin: 0 0 10px; letter-spacing: -0.01em; }
+
+/* Measured off linear.app (64px / 510 / -0.022em / 1.0), vercel.com (64px /
+   400 / -0.06em / 1.0) and resend.com (96px / 400 / 1.0). The shared lesson is
+   that display type is large, LIGHT and set at leading 1.0. Bold at 30px reads
+   as a default; regular at 56px reads as designed. */
+h1 {
+  font-size: clamp(34px, 5.4vw, 56px);
+  font-weight: 450;
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+  margin: 22px 0 10px;
+  text-wrap: balance;
+}
+h2 {
+  font-size: 21px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  margin: 34px 0 10px;
+}
+h3 { font-size: 17px; font-weight: 550; margin: 0 0 10px; letter-spacing: -0.015em; }
 .sub { color: var(--ink-soft); margin: 6px 0 18px; max-width: 62ch; }
 .eyebrow {
   font-family: var(--mono);
@@ -216,7 +238,7 @@ h3 { font-size: 17px; margin: 0 0 10px; letter-spacing: -0.01em; }
   margin: 0;
 }
 .section-head { display: flex; align-items: center; gap: 8px; }
-.section-head svg { color: var(--ink-faint); }
+.section-head svg { color: var(--accent-ink); }
 
 /* --- onboarding --------------------------------------------------------- */
 
@@ -224,15 +246,35 @@ h3 { font-size: 17px; margin: 0 0 10px; letter-spacing: -0.01em; }
   border: 1px solid var(--border);
   background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%);
   border-radius: 16px;
-  padding: 30px 28px;
+  padding: clamp(26px, 4vw, 44px) clamp(22px, 3.4vw, 40px);
   box-shadow: var(--shadow);
 }
-.hero h1 { margin-top: 10px; max-width: 26ch; }
-.hero-lead { font-size: 18px; color: var(--ink-soft); max-width: 56ch; margin: 0 0 22px; }
+.hero h1 { margin-top: 14px; max-width: 22ch; }
+.hero-lead {
+  font-size: 18px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  max-width: 48ch;
+  margin: 0 0 26px;
+}
 .hero-lead b { color: var(--ink); }
 .hero-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 
-.how { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; }
+/* Asymmetric on purpose. Three equal cards is the templated default, and the
+   first step (reading the page with no demonstration) is the novel claim, so
+   it carries more weight than the two that follow. */
+.how { display: grid; grid-template-columns: 1.35fr 1fr; gap: 14px; align-items: start; }
+.how-rest { display: grid; gap: 14px; }
+.how-step.lead { padding: 22px; }
+.how-step.lead b { font-size: 18px; margin-top: 12px; }
+.how-step > svg { color: var(--accent-ink); }
+.how-aside {
+  margin-top: 12px !important;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 14px !important;
+  color: var(--ink-faint) !important;
+}
 .how-step {
   border: 1px solid var(--border);
   background: var(--surface);
@@ -252,7 +294,7 @@ h3 { font-size: 17px; margin: 0 0 10px; letter-spacing: -0.01em; }
   place-items: center;
   margin-bottom: 10px;
 }
-.how-step b { display: block; margin-bottom: 4px; }
+.how-step b { display: block; margin: 8px 0 4px; }
 .how-step p { margin: 0; font-size: 15px; color: var(--ink-soft); }
 
 .checklist { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
@@ -282,15 +324,28 @@ h3 { font-size: 17px; margin: 0 0 10px; letter-spacing: -0.01em; }
 .ck-note { font-size: 14px; color: var(--ink-soft); }
 .progress-line { font-family: var(--mono); font-size: 13px; color: var(--ink-faint); }
 
-.support { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
-.support-card {
-  border: 1px solid var(--border);
-  background: var(--surface);
-  border-radius: var(--radius);
-  padding: 15px;
+.wont { margin: 0; border-top: 1px solid var(--border); }
+.wont > div {
+  display: grid;
+  grid-template-columns: minmax(180px, 15rem) 1fr;
+  gap: 8px 28px;
+  padding: 16px 2px;
+  border-bottom: 1px solid var(--border);
 }
-.support-card b { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.support-card p { margin: 0; font-size: 15px; color: var(--ink-soft); }
+.wont dt {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 550;
+  letter-spacing: -0.01em;
+}
+.wont dt svg { color: var(--bad); flex: none; }
+.wont dd { margin: 0; color: var(--ink-soft); font-size: 15px; max-width: 62ch; }
+
+@media (max-width: 720px) {
+  .how { grid-template-columns: 1fr; }
+  .wont > div { grid-template-columns: 1fr; gap: 4px; }
+}
 
 /* --- cards -------------------------------------------------------------- */
 
