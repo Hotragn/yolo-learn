@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://yolo-learn.vercel.app"><img src="https://img.shields.io/badge/live%20demo-yolo--learn.vercel.app-7BD40A?style=flat-square&labelColor=0B1220" alt="Live demo"></a>
-  <img src="https://img.shields.io/badge/tests-175%20passing-7BD40A?style=flat-square&labelColor=0B1220" alt="175 tests passing">
+  <img src="https://img.shields.io/badge/tests-188%20passing-7BD40A?style=flat-square&labelColor=0B1220" alt="188 tests passing">
   <img src="https://img.shields.io/badge/Chrome%20149-7%2F7%20tools%20registered-7BD40A?style=flat-square&labelColor=0B1220" alt="Verified on Chrome 149">
   <img src="https://img.shields.io/badge/dependencies-react%20only-0B1220?style=flat-square" alt="React only">
   <img src="https://img.shields.io/badge/license-MIT-0B1220?style=flat-square" alt="MIT license">
@@ -481,7 +481,7 @@ npm run dev
 | `#/?demo=healed` | Seeded: healed and matching |
 
 ```
-npm test          # 175 unit tests
+npm test          # 188 unit tests
 npm run check:ssrf # 14 SSRF vectors through the real handler
 npm run typecheck
 npm run build
