@@ -222,7 +222,8 @@ export default function App() {
 
         <footer className="foot">
           <span>
-            {PRODUCT} - fictional clinic, local-only storage, no backend. Every submit is approved by you.
+            {PRODUCT} - fictional clinic, local-only storage, no accounts. One endpoint, which fetches pages and
+            stores nothing. Every submit is approved by you.
           </span>
           <span>
             Built by{" "}
@@ -573,8 +574,9 @@ function Onboarding() {
             <IconNoSend size={17} /> Send anything anywhere
           </dt>
           <dd>
-            Single origin, <code>localStorage</code> only. No backend, no accounts, no telemetry. The clinic is
-            fictional and no booking is real.
+            No accounts, no telemetry, nothing about you stored anywhere. Flows and audit memory live in your
+            browser. There is one endpoint, which fetches a page you asked for so this can read it, and keeps no
+            record of it. The clinic is fictional and no booking is real.
           </dd>
         </div>
       </dl>

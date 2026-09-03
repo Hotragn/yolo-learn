@@ -559,8 +559,10 @@ carries `untrustedContentHint`.
   discarded.
 - **Trust its input.** Arguments are coerced, length-capped, checked against the
   live option lists, and dates must be real calendar dates.
-- **Send your data anywhere.** Single origin, `localStorage` only. No backend, no
-  accounts, no telemetry. The clinic is fictional and no booking is real.
+- **Send your data anywhere.** No accounts, no telemetry, nothing about you
+  stored anywhere. Flows and audit memory live in your browser. There is one
+  endpoint, which fetches a page you asked for so this can read it, and keeps no
+  record of it. The clinic is fictional and no booking is real.
 
 ## How it is built
 
