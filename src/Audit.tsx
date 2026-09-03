@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react"
 import { Finding, Lens, LensReport } from "./audit/lenses"
-import { auditDocument, auditHTML, AuditResult, forgetAudits } from "./audit/run"
+import { auditDocument, auditHTML, AuditResult, auditUrl, forgetAudits } from "./audit/run"
 import { logEvent } from "./store"
 import { IconAlert, IconCheck, IconDrift, IconHeal, IconRead, IconRefuse, IconRun } from "./icons"
 
@@ -138,6 +138,7 @@ export function Audit() {
   const [reports, setReports] = useState<LensReport[]>([])
   const [result, setResult] = useState<AuditResult | null>(null)
   const [html, setHtml] = useState(SAMPLE)
+  const [url, setUrl] = useState("")
   const [busy, setBusy] = useState(false)
 
   // Reveal the lenses one at a time. They are fast enough to finish in a frame,
@@ -161,6 +162,19 @@ export function Audit() {
     try {
       const out = auditDocument(document, { label: location.origin + "/audit-self" })
       logEvent("learn", `Audited this page: ${out.totals.findings} finding(s) across 3 lenses`)
+      await reveal(out)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const runOnUrl = async () => {
+    if (!url.trim()) return
+    setBusy(true)
+    setResult(null)
+    try {
+      const out = await auditUrl(url.trim())
+      logEvent("learn", `Audited ${url.trim()}: ${out.totals.findings} finding(s)`)
       await reveal(out)
     } finally {
       setBusy(false)
@@ -197,6 +211,37 @@ export function Audit() {
           </div>
         ))}
       </div>
+
+      <form
+        className="url-bar"
+        onSubmit={(e) => {
+          e.preventDefault()
+          void runOnUrl()
+        }}
+      >
+        <label className="field">
+          <span>
+            Audit a live page <small>any public URL, no extension and nothing to install</small>
+          </span>
+          <div className="url-row">
+            <input
+              type="url"
+              placeholder="https://example.com/contact"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+            />
+            <button className="primary" type="submit" disabled={busy || !url.trim()}>
+              <IconRead size={17} /> {busy ? "Reading..." : "Audit it"}
+            </button>
+          </div>
+        </label>
+        <p className="explain-note">
+          A serverless function fetches the page, because a browser is not allowed to read another origin. The three
+          lenses still run here, in your browser, in a sandboxed frame with scripts disabled. Nothing from the target
+          page executes, which also means a site that renders its content with JavaScript will look nearly empty. Only
+          public pages: private and reserved addresses are refused.
+        </p>
+      </form>
 
       <div className="row audit-actions">
         <button className="primary" onClick={() => void runOnThisPage()} disabled={busy}>

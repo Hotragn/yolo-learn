@@ -192,3 +192,66 @@ export async function auditHTML(html: string, options: RunOptions = {}): Promise
     frame.remove()
   }
 }
+
+
+// --- auditing a public URL ----------------------------------------------
+
+export interface FetchedPage {
+  html?: string
+  finalUrl?: string
+  redirected?: boolean
+  bytes?: number
+  notes?: string[]
+  error?: string
+}
+
+/**
+ * Audit a public URL.
+ *
+ * The division of labour matters: a serverless function does the one thing a
+ * static page cannot, which is read another origin, and hands back markup. The
+ * measuring still happens here, in the sandboxed iframe, so layout and the
+ * cascade are the browser's own rather than a headless simulation of them.
+ *
+ * The honest limit is that no JavaScript from the target ever runs, so a page
+ * that renders its content client-side will look close to empty. That is
+ * stated in the result rather than left to be discovered.
+ */
+export async function auditUrl(url: string, options: RunOptions = {}): Promise<AuditResult & { page?: FetchedPage }> {
+  let page: FetchedPage
+  try {
+    const response = await fetch(`/api/fetch-page?url=${encodeURIComponent(url)}`)
+    page = (await response.json()) as FetchedPage
+  } catch (err) {
+    return {
+      ...summarise([], [`Could not reach the fetch endpoint: ${err instanceof Error ? err.message : String(err)}`]),
+    }
+  }
+
+  if (page.error || !page.html) {
+    return { ...summarise([], [page.error ?? "Nothing came back from that URL."]), page }
+  }
+
+  const origin = (() => {
+    try {
+      return new URL(page.finalUrl ?? url).origin
+    } catch {
+      return url
+    }
+  })()
+
+  const result = await auditHTML(page.html, { ...options, label: origin })
+  const bodyText = page.html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()
+
+  return {
+    ...result,
+    page,
+    notes: [
+      `Fetched ${page.finalUrl}${page.redirected ? " (after a redirect)" : ""}, ${Math.round((page.bytes ?? 0) / 1024)}KB.`,
+      ...(page.notes ?? []),
+      "No JavaScript from the target ran, so anything it renders client-side is not measured here." +
+        (bodyText.length < 400 ? " This page returned very little static text, which usually means exactly that." : ""),
+      ...result.notes,
+    ],
+  }
+}

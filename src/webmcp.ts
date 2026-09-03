@@ -37,7 +37,7 @@ import { coerceValue, getActiveSiteModel, TaughtFlow } from "./types"
 import { getFlow, loadFlows, logEvent, patchFlow } from "./store"
 import { detectDrift, effectiveStatus, healFlow, storedValue } from "./drift"
 import { loadRun, normalizeParams, runFlowInteractive } from "./runner"
-import { auditDocument } from "./audit/run"
+import { auditDocument, auditUrl } from "./audit/run"
 import { beginTeaching } from "./TeachMode"
 
 export interface ToolAnnotations {
@@ -551,6 +551,58 @@ export async function registerStaticTools(): Promise<void> {
           })),
           notComputable: r.unknowns.map((u) => ({ element: u.element, why: u.detail })),
           notes: r.notes,
+        })),
+        diff: out.diff,
+        limits: out.notes,
+      }
+    },
+  })
+
+  await registerTool({
+    name: "audit_url",
+    description:
+      "Audit any public web page by URL. The page is fetched server-side, because a browser cannot read another " +
+      "origin, then measured in this browser in a sandboxed frame with scripts disabled. Returns the same three " +
+      "lenses as audit_page. Two limits worth passing on to the user: no JavaScript from the target runs, so a " +
+      "client-rendered site will look nearly empty, and private or reserved addresses are refused.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "An http or https URL of a public page" },
+      },
+      required: ["url"],
+    },
+    annotations: { readOnlyHint: true, untrustedContentHint: true },
+    execute: async (args, { signal }) => {
+      const bad = aborted(signal)
+      if (bad) return bad
+      const target = coerceValue(args.url).trim()
+      if (!target) return { error: "Pass a url." }
+      const out = await auditUrl(target)
+      if (out.page?.error) return { error: out.page.error, summary: "Nothing was measured." }
+      return {
+        summary:
+          `${out.totals.findings} finding(s) from ${out.totals.checked} checks on ${out.page?.finalUrl ?? target}: ` +
+          `${out.bySeverity.high} high, ${out.bySeverity.medium} medium, ${out.bySeverity.low} low. ` +
+          `${out.totals.unknowns} not computable.`,
+        fetched: out.page?.finalUrl,
+        totals: out.totals,
+        bySeverity: out.bySeverity,
+        lenses: out.reports.map((r) => ({
+          lens: r.lens,
+          checked: r.checked,
+          findings: r.findings.map((f) => ({
+            severity: f.severity,
+            rule: f.rule.id,
+            ruleName: f.rule.name,
+            source: f.rule.source,
+            standard: f.rule.source !== "house rule",
+            element: f.element,
+            detail: f.detail,
+            measured: f.measured,
+            threshold: f.threshold,
+          })),
+          notComputable: r.unknowns.map((u) => ({ element: u.element, why: u.detail })),
         })),
         diff: out.diff,
         limits: out.notes,

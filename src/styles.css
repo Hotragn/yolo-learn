@@ -1387,3 +1387,11 @@ header nav a { white-space: nowrap; }
 @media (max-width: 760px) {
   .lens-legend { grid-template-columns: 1fr; }
 }
+
+.url-bar { margin: 4px 0 18px; }
+.url-row { display: flex; gap: 8px; }
+.url-row input { flex: 1; font-family: var(--mono); font-size: 14px; }
+.url-row button { white-space: nowrap; }
+@media (max-width: 620px) {
+  .url-row { flex-direction: column; }
+}
