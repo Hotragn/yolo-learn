@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://yolo-learn.vercel.app"><img src="https://img.shields.io/badge/live%20demo-yolo--learn.vercel.app-7BD40A?style=flat-square&labelColor=0B1220" alt="Live demo"></a>
-  <img src="https://img.shields.io/badge/tests-85%20passing-7BD40A?style=flat-square&labelColor=0B1220" alt="85 tests passing">
+  <img src="https://img.shields.io/badge/tests-106%20passing-7BD40A?style=flat-square&labelColor=0B1220" alt="106 tests passing">
   <img src="https://img.shields.io/badge/Chrome%20149-7%2F7%20tools%20registered-7BD40A?style=flat-square&labelColor=0B1220" alt="Verified on Chrome 149">
   <img src="https://img.shields.io/badge/dependencies-react%20only-0B1220?style=flat-square" alt="React only">
   <img src="https://img.shields.io/badge/license-MIT-0B1220?style=flat-square" alt="MIT license">
@@ -188,7 +188,7 @@ Answer it. Run again. Green.
 | [`drift.ts`](src/drift.ts) | Deterministic drift detection and healing |
 | [`learn.ts`](src/learn.ts) | Turns a discovery into a flow and a tool |
 | [`webmcp.ts`](src/webmcp.ts) | The verified WebMCP layer |
-| [`runner.ts`](src/runner.ts) | Run orchestration and untrusted-argument handling |
+| [`runner.ts`](src/runner.ts) | Resumable run state, the plan, untrusted arguments |
 | [`recall.ts`](src/recall.ts) | The cache lookup: miss, hit or stale |
 | [`store.ts`](src/store.ts) | The semantic map, in `localStorage` |
 | [`guided.ts`](src/guided.ts) | The guided run and the seeded deep links |
@@ -215,20 +215,56 @@ The cross-origin parts of the spec (`exposedTo`, `getTools({fromOrigins})`,
 not let you read an arbitrary site, so they are not an answer to the long tail.
 A content script is.
 
-### What multi-page costs
+### Multi-page: the runner is resumable
 
-A page navigation destroys all JavaScript state, so three things change:
+A page navigation destroys all JavaScript state, including the promise the agent
+is waiting on. Three things were built for that, and all three are in:
 
-1. **A step gains a route.** `route: { pathname, match }`, recorded during
-   discovery. A route that no longer resolves is a new drift type,
-   `ROUTE_CHANGED`.
-2. **The runner becomes resumable.** Run state (`runId`, `stepIndex`, `params`)
-   moves out of the page. Every page load asks whether there is an active run
-   whose next step matches this route.
-3. **The approval gate moves per step.** One approval at the end is correct for a
-   single-document wizard and wrong the moment a flow spans pages. Steps gain
-   `sideEffect: none | reversible | irreversible`, and the run stops at every
-   irreversible boundary.
+**1. Run state lives outside the document.** `runId`, `flowId`, `params`,
+`stepIndex` and everything already filled go in `sessionStorage`: per tab,
+because two tabs must not fight over one run, and gone with the tab, because a
+run is not a document. The runner checkpoints after every step.
+
+**2. The runner picks up where it stopped.** Proven the blunt way, by reloading
+the browser mid-run:
+
+```
+before reload   stepIndex 3, 5 values filled, status "running"
+  ... hard reload, every module-level variable destroyed ...
+after  reload   same runId, stepIndex 3, same 5 values, back at the approval gate
+```
+
+The site shows a banner saying the run survived a teardown, and
+`get_run_status` reports `resumedAfterTeardown: 1`.
+
+**3. A step gains a route and a side effect.** Discovery records
+`route: { path, hash }` per step, and a step that moves is reported as
+`ROUTE_CHANGED` drift. It also classifies the button:
+`sideEffect: none | reversible | irreversible`, derived from the label and
+**conservative by default**, so anything that does not clearly read as
+navigation is gated. The run stops at *every* irreversible step, not once at
+the end, because by the time a multi-page flow reaches the end the earlier
+steps have already committed.
+
+### How an agent recovers
+
+Its promise died with the page, so it cannot be told. It has to ask:
+
+```
+get_run_status  ->  { status: "awaiting_approval", step: 4, of: 4,
+                      resumedAfterTeardown: 1,
+                      message: 'waiting for you to approve "Confirm booking"' }
+```
+
+The outcome also lands in the flow's own run history, so `list_flows` works as
+a fallback. A second run while one is in flight is refused with a clear
+message rather than silently queued.
+
+**What is honestly not proven:** the demo site is a single document with hash
+routes, so no real navigation happens in it. What has been proven is the
+property that actually matters, which is that a run survives its JavaScript
+context being destroyed, and a full reload is the most severe version of that.
+Pointing this at a genuinely multi-document checkout is untested.
 
 ### What multi-flow costs
 
@@ -267,8 +303,14 @@ the behaviour is specified above but not yet coded.
 | Agent aborts mid-run | Handled | Cancels between steps and inside every pause |
 | Corrupt `localStorage` | Handled | Bad entries dropped rather than crashing |
 | Hostile tool arguments | Handled | Coerced, length-capped, enum-checked, real-date-checked |
-| Flow spans several pages | Designed | Route per step, resumable runner, per-step gate |
-| Site changes its URLs | Designed | `ROUTE_CHANGED` drift |
+| Run interrupted by a page teardown | Handled | Resumes at the step it reached. Verified by reloading mid-run |
+| Agent's promise lost to a navigation | Handled | `get_run_status` reports the run. Outcome also in flow history |
+| Irreversible step mid-flow | Handled | Gated at every irreversible step, not once at the end |
+| Unrecognised button wording | Handled | Classified irreversible, so it gets a gate |
+| Second run while one is in flight | Handled | Refused with a message, not queued |
+| Two tabs running at once | Handled | Run state is per tab, so they cannot collide |
+| Site changes its URLs | Handled | `ROUTE_CHANGED` drift, auto-healable |
+| A genuinely multi-document site | Designed | Mechanism is in and tested. Never pointed at a real one |
 | SPA route change with no page load | Designed | Observe `pushState` and `popstate` |
 | Options loaded asynchronously | Designed | Wait for the option list to settle before reading |
 | Two layouts behind one URL (A/B test) | Designed | Store variants per step intent |
@@ -298,7 +340,7 @@ npm run dev
 | `#/?demo=healed` | Seeded: healed and matching |
 
 ```
-npm test          # 85 unit tests
+npm test          # 106 unit tests
 npm run typecheck
 npm run build
 ```
@@ -354,6 +396,7 @@ the human owns the submit.
 | `check_flow_health` | Plain-English drift report and any questions |
 | `run_flow` | Run a flow. The human approves the submit |
 | `heal_flow` | Apply answers and re-read the site |
+| `get_run_status` | **Recover a run** whose promise a navigation destroyed |
 | `get_site_info` | Current site version and changelog |
 | `start_teaching` | Teach mode, for when you want your own values kept |
 | *`<flow name>`* | Minted per learned flow, schema built from what it found |

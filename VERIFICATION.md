@@ -3,7 +3,7 @@
 **Live:** https://yolo-learn.vercel.app
 **Repo:** https://github.com/Hotragn/yolo-learn (public, MIT)
 
-`npm test` (73 tests), `npm run typecheck`, `npm run build` — all green. Browser
+`npm test` (106 tests), `npm run typecheck`, `npm run build` - all green. Browser
 QA driven through a headless Chromium against the dev server, the local
 production build (`vite preview`), and the live Vercel deployment.
 
@@ -14,13 +14,13 @@ production build (`vite preview`), and the live Vercel deployment.
 
 That single line settles three things at once:
 
-1. `document.modelContext` is the live entry point — the primary detection path
+1. `document.modelContext` is the live entry point - the primary detection path
    is correct, and the `navigator.modelContext` fallback is not what fired.
 2. All seven built-in tools registered without an `InvalidStateError`, so the
    name-uniquing holds against a real registry.
 3. `Origin-Agent-Cluster: ?1` is landing in production. Without it, every one of
    those `registerTool()` calls would have rejected with `SecurityError` and the
-   banner would have been red — which is the requirement BUILD.md never
+   banner would have been red - which is the requirement BUILD.md never
    mentioned and the reason it is shipped in `vercel.json`.
 
 ---
@@ -29,7 +29,7 @@ That single line settles three things at once:
 
 The headline capability: learn a task on a site with **no human
 demonstration**. [`src/discover.ts`](src/discover.ts) reads the live DOM and
-deliberately never imports the site model in `types.ts` — if it read our own
+deliberately never imports the site model in `types.ts` - if it read our own
 fixture, "it can learn a page nobody described to it" would be a lie.
 
 What it reads, in priority order:
@@ -51,7 +51,7 @@ learn_site → Learned "clinic_booking" by reading the page:
 notes      → ["Stopped at step 4 of 4 without submitting."]
 ```
 
-Learning **v2 directly** — a layout it has never seen — discovers the redesigned
+Learning **v2 directly** - a layout it has never seen - discovers the redesigned
 shape correctly, including the field that does not exist in v1:
 
 ```
@@ -64,7 +64,7 @@ params → date, time, serviceType, patientName, phone, insuranceId
 1. **It will not press a button it does not understand.** It advances only
    through a label matching `next|continue|proceed|forward|onward`, or where a
    `Step N of M` counter proves there is more to come. Anything else is terminal
-   and never clicked — so discovery cannot trip a real submit. Verified: on both
+   and never clicked - so discovery cannot trip a real submit. Verified: on both
    site versions it stops at step 4 without pressing `Confirm booking` /
    `Book appointment`, and a fixture whose button reads `Place order` is refused.
 2. **It invents nothing.** Discovery stores the shape of the task and zero
@@ -84,7 +84,7 @@ failing. That makes the two learning paths differ in exactly the right way:
 | | Learned autonomously | Taught by demonstration |
 | --- | --- | --- |
 | Stored values | none | every field the user filled |
-| `inputSchema.required` | every parameter | none — omitting one reuses the demo value |
+| `inputSchema.required` | every parameter | none - omitting one reuses the demo value |
 | Verified call with `{}` | names the missing parameter | replays `checkup / 2026-09-11 / 10:00 AM / Jane Doe / 555-0142` |
 | Questions after v2 redesign | 1 (insurance ID) | 1 (insurance ID) |
 
@@ -106,7 +106,7 @@ earlier proposal used `navigator.modelContext`, so both are feature-detected),
 `execute` is `Promise<any> (inputObject, {signal})`, and the declarative
 attribute names. Added from the spec: `readOnlyHint` / `untrustedContentHint`,
 the `toolchange` event (so the Tools view listens instead of polling on a
-timer), and `name` attributes on form controls — without which the declarative
+timer), and `name` attributes on form controls - without which the declarative
 tool's schema has no usable property keys. `toolautosubmit` is deliberately not
 used: the human owns the submit.
 
@@ -118,7 +118,7 @@ live production deployment** from cleared storage.
 | Loop | Time | Result |
 | --- | --- | --- |
 | Autonomous (learn → run → v2 → heal → run) | **16s** | green |
-| Taught (demonstrate → mint → run → v2 → heal → run) | **18–19s** | green |
+| Taught (demonstrate → mint → run → v2 → heal → run) | **18-19s** | green |
 
 Budget was 90 seconds.
 
@@ -158,9 +158,9 @@ One change per line of the site's own changelog, asserted by test.
 | Theme choice | Persists across reload; `system` follows `prefers-color-scheme` |
 | Onboarding checklist | Ticks itself to 3/3 from real flow state |
 | Reset demo data | Clears flows, unregisters tools, empties the audit trail |
-| Firefox graceful degradation | **Verified by code path, not in Firefox.** All QA ran in a Chromium with no `document.modelContext` — the identical degradation path: amber banner naming the flag, every page functional, nothing thrown. |
+| Firefox graceful degradation | **Verified by code path, not in Firefox.** All QA ran in a Chromium with no `document.modelContext` - the identical degradation path: amber banner naming the flag, every page functional, nothing thrown. |
 | Chrome 149 with the WebMCP flag | **Verified.** Green banner, `document.modelContext`, 7 of 7 tools registered natively |
-| ChatGPT desktop in-app browser | **Not verified — see limitations** |
+| ChatGPT desktop in-app browser | **Not verified - see limitations** |
 
 ### Bugs the browser pass found that unit tests could not
 
@@ -232,12 +232,38 @@ lime (about 11:1) and lime-coloured text uses a darkened `--accent-ink` (about
     `minted.ts`, `icons.tsx`, `Modal.tsx`, `AgentConsole.tsx`, `__tests__/*`,
     `vitest.config.ts`, `vercel.json`, and this file.
 
-## 7. Limitations — what is NOT verified
+## 6b. The resumable runner
+
+Built after the multi-page analysis, and verified by tearing the page down
+rather than by reasoning about it.
+
+| Property | How it was verified |
+| --- | --- |
+| Run state outlives the document | Hard reload mid-run. Same `runId`, same `stepIndex` (3), same 5 filled values, back at the approval gate |
+| The human gate survives too | After the reload the approval dialog is present again and the run reads `awaiting_approval` |
+| An agent can recover a lost promise | `get_run_status` returned step 4 of 4 with `resumedAfterTeardown: 1` |
+| The outcome is durable | `done`, reference `NSC-5268`, written to the flow's run history |
+| Gates sit at irreversible steps | Test asserts exactly one gate on both site versions, on `confirm booking` |
+| Unrecognised wording is gated | `classifySideEffect` returns irreversible for anything not clearly navigation |
+| Concurrency | A second run while one is in flight is refused, via both the minted tool and `run_flow` |
+| Per-tab isolation | Run state is `sessionStorage`; a test asserts it is not in `localStorage` |
+| No regression | The 9-beat guided run is still green after the runner was rewritten under it |
+
+Deliberately **not** claimed: this has never been pointed at a real
+multi-document site. The demo is one document with hash routes, so no true
+navigation happens in it. A full reload is a strictly harsher teardown than a
+navigation, which is why that is what was tested, but "works on a real
+checkout" remains unproven.
+
+## 7. Limitations - what is NOT verified
 
 - **The ChatGPT desktop in-app browser.** Not tested. Native registration is
   confirmed on Chrome 149 (see the top of this document), so the remaining risk
   is specific to that browser's WebMCP build rather than to this integration.
 - **Firefox itself.** The degradation path is verified; the browser is not.
+- **A real multi-document flow.** The resumable runner is built and tested
+  against a document teardown, but the demo site is a single document, so
+  nothing here has crossed a real page navigation.
 - **Discovery against arbitrary real-world sites.** It is unit-tested against
   fixtures with markup the demo site does not use (labels by `for`/`id`,
   `autocomplete` with no `name`, no headings, hidden and disabled controls,
