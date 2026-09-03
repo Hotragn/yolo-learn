@@ -214,6 +214,13 @@ export type ChangeType =
   | "REMOVED_STEP"
   | "NEW_STEP"
   | "ROUTE_CHANGED"
+  // Real redesigns do more than rename and reorder: they tighten a text box
+  // into a dropdown, add a service to a list, and flip fields between
+  // optional and required. Each is described in drift-taxonomy.ts.
+  | "TYPE_CHANGED"
+  | "OPTIONS_CHANGED"
+  | "REQUIRED_ADDED"
+  | "REQUIRED_RELAXED"
 
 export interface DriftChange {
   type: ChangeType

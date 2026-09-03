@@ -8,6 +8,7 @@ import {
   StepSpec,
   TaughtFlow,
 } from "./types"
+import { healsFromPage } from "./drift-taxonomy"
 
 // Deterministic drift detection. No ML, no heuristics, no guessing.
 //
@@ -17,6 +18,30 @@ import {
 // heal from the site model alone. The only thing the app genuinely cannot know
 // is a value it has never been told, so that - and only that - becomes a
 // question for the human.
+
+/** Order-sensitive option comparison. A reordered list is still a changed list. */
+function sameOptions(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((v, i) => v === b[i])
+}
+
+function squash(v: string): string {
+  return v.trim().replace(/\s+/g, " ").toLowerCase()
+}
+
+/**
+ * The value this task relies on, when the page no longer offers it.
+ *
+ * The case that used to fail silently, and the reason OPTIONS_CHANGED exists.
+ * A select that drops "dental cleaning" leaves a stored task pointing at a
+ * choice the page will not accept, and filling it submits an empty field with
+ * no error at all. Detecting it turns a silent wrong answer into one question.
+ */
+export function rejectedChoice(flow: TaughtFlow, field: FieldSpec): string | undefined {
+  if (!field.options?.length) return undefined
+  const stored = storedValue(flow, field.purpose)
+  if (!stored) return undefined
+  return field.options.some((o) => squash(o) === squash(stored)) ? undefined : stored
+}
 
 /** A value the flow already knows for this purpose, from the demo or from healing. */
 export function storedValue(flow: TaughtFlow, purpose: string): string | undefined {
@@ -55,9 +80,22 @@ function commonIntents(flow: TaughtFlow, current: SiteModel): { taught: string[]
   }
 }
 
-function questionFor(field: FieldSpec): DriftQuestion {
+function questionFor(field: FieldSpec, rejected?: string): DriftQuestion {
+  const id = `q_${field.purpose.replace(/[^a-z0-9]+/gi, "_")}`
+  // A withdrawn choice is a different question from a brand new field, and
+  // saying which one it is saves the user working it out.
+  if (rejected) {
+    return {
+      id,
+      purpose: field.purpose,
+      label: field.label,
+      question:
+        `"${field.label}" no longer offers "${rejected}", which this task used to pick. ` +
+        `Choose from: ${(field.options ?? []).join(", ")}.`,
+    }
+  }
   return {
-    id: `q_${field.purpose.replace(/[^a-z0-9]+/gi, "_")}`,
+    id,
     purpose: field.purpose,
     label: field.label,
     question: `The site now asks for "${field.label}". What should I answer?`,
@@ -74,8 +112,13 @@ export function detectDrift(flow: TaughtFlow, current: SiteModel): DriftReport {
   // This is what lets an autonomously learned flow - every field a parameter,
   // no invented values - come out of discovery with nothing to ask.
   const parameterised = new Set(flow.params.map((p) => p.sourceField.fieldPurpose))
+  // Required, not supplied by a parameter, and either nothing stored OR a
+  // stored value the page no longer offers. That second case is the one that
+  // used to submit an empty field with no error.
   const needsAnswer = (f: FieldSpec) =>
-    !!f.required && storedValue(flow, f.purpose) === undefined && !parameterised.has(f.purpose)
+    !!f.required &&
+    !parameterised.has(f.purpose) &&
+    (storedValue(flow, f.purpose) === undefined || rejectedChoice(flow, f) !== undefined)
 
   const taughtByIntent = new Map<string, StepSpec>(flow.steps.map((s) => [s.intent, s]))
 
@@ -100,11 +143,58 @@ export function detectDrift(flow: TaughtFlow, current: SiteModel): DriftReport {
           description: `New field "${curField.label}" appeared in "${curStep.intent}"`,
           autoHealable: !needsAnswer(curField),
         })
-      } else if (taughtField.label !== curField.label) {
+        continue
+      }
+
+      // Independent checks rather than an else-if chain: a real release
+      // happily renames a field AND changes its choices at the same time.
+      if (taughtField.label !== curField.label) {
         changes.push({
           type: "RENAMED",
           description: `"${taughtField.label}" is now labeled "${curField.label}"`,
-          autoHealable: true,
+          autoHealable: healsFromPage("RENAMED"),
+        })
+      }
+
+      if (taughtField.type !== curField.type) {
+        changes.push({
+          type: "TYPE_CHANGED",
+          description: `"${curField.label}" changed from ${taughtField.type} to ${curField.type}`,
+          autoHealable: healsFromPage("TYPE_CHANGED"),
+        })
+      }
+
+      const before = taughtField.options ?? []
+      const after = curField.options ?? []
+      if (!sameOptions(before, after)) {
+        const gone = before.filter((o) => !after.includes(o))
+        const added = after.filter((o) => !before.includes(o))
+        const rejected = rejectedChoice(flow, curField)
+        const parts: string[] = []
+        if (added.length) parts.push(`added ${added.join(", ")}`)
+        if (gone.length) parts.push(`dropped ${gone.join(", ")}`)
+        changes.push({
+          type: "OPTIONS_CHANGED",
+          description:
+            `Choices for "${curField.label}" changed: ${parts.join(" and ")}` +
+            (rejected ? `. This task used "${rejected}", which is no longer offered` : ""),
+          // Overrides the taxonomy default on purpose: a longer list is just
+          // readable, but a list that dropped OUR value needs a human.
+          autoHealable: !rejected,
+        })
+      }
+
+      if (!taughtField.required && curField.required) {
+        changes.push({
+          type: "REQUIRED_ADDED",
+          description: `"${curField.label}" is now required`,
+          autoHealable: !needsAnswer(curField),
+        })
+      } else if (taughtField.required && !curField.required) {
+        changes.push({
+          type: "REQUIRED_RELAXED",
+          description: `"${curField.label}" is no longer required`,
+          autoHealable: healsFromPage("REQUIRED_RELAXED"),
         })
       }
     }
@@ -170,7 +260,7 @@ export function detectDrift(flow: TaughtFlow, current: SiteModel): DriftReport {
   for (const curStep of current.steps) {
     for (const field of curStep.fields) {
       if (needsAnswer(field) && !questions.some((q) => q.purpose === field.purpose)) {
-        questions.push(questionFor(field))
+        questions.push(questionFor(field, rejectedChoice(flow, field)))
       }
     }
   }

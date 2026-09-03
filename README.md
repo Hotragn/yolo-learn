@@ -15,19 +15,42 @@
   <img src="https://img.shields.io/badge/WebMCP-registerTool-7BD40A?style=flat-square&labelColor=0B1220" alt="WebMCP">
   <img src="https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript">
   <img src="https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=0B1220" alt="React">
-  <img src="https://img.shields.io/badge/tests-226-passing-7BD40A?style=flat-square&labelColor=0B1220" alt="226 tests">
+  <img src="https://img.shields.io/badge/tests-239-passing-7BD40A?style=flat-square&labelColor=0B1220" alt="239 tests">
   <img src="https://img.shields.io/badge/license-MIT-0B1220?style=flat-square" alt="MIT">
 </p>
 
 <p align="center">
   <a href="https://yolo-learn.vercel.app"><strong>Live demo</strong></a>
   ·
+  <a href="#measured">Measured</a>
+  ·
   <a href="#the-problem">The problem</a>
   ·
-  <a href="#webmcp">WebMCP</a>
+  <a href="#the-drift-taxonomy">Drift taxonomy</a>
   ·
-  <a href="src/webmcp.ts"><code>src/webmcp.ts</code></a>
+  <a href="#webmcp">WebMCP</a>
 </p>
+
+---
+
+<h3 align="center">No extension. No account. Open the URL.</h3>
+
+<p align="center">
+  Every comparable approach to making unfamiliar sites agent-ready ships a browser extension.<br>
+  This is a web page. The only thing it cannot do without one is watch a tab it does not own.
+</p>
+
+## Measured
+
+Not claims. Numbers, each reproducible from the live site.
+
+| What | Result | How to check it |
+| --- | --- | --- |
+| **Re-reading a site it already knows** | **1230× faster**, 466KB to 0 | `learn_url` on Wikipedia twice; the second is served from memory |
+| **Agreement with W3C on W3C's own pages** | **44 findings to 3.** High 8 to 0, medium 33 to 0 | Audit the WAI before/after pair; nobody here wrote either version |
+| **Server-side fetch, SSRF surface** | **14 of 14 vectors blocked**, including `localhost` resolving to `::1` and the cloud metadata IP | `node ssrf-check.mjs` |
+| **A run interrupted by a page teardown** | Resumes at the step it reached, approval gate intact | Start a run, hard-reload mid-flight |
+| **Tests** | 239, including one that reproduces a real ChatGPT invocation crash | `npm test` |
 
 ---
 
@@ -69,6 +92,41 @@ Still of the architecture (not a full-page screenshot):
 </p>
 
 ---
+
+## The drift taxonomy
+
+The core artifact. Twelve named ways a page can move, and for each one a single
+decision: **does the repair come from the page, or from a human?**
+
+One rule decides every row. *A change heals from the page when the new truth is
+on the page. It needs a human only when it requires a value nobody has ever
+supplied.* A rename heals because the new label is right there. A new required
+field cannot, because no amount of reading tells you somebody's insurance
+number. That is why the v2 redesign produces four changes and exactly one
+question.
+
+| Change | Repaired by | Why |
+| --- | --- | --- |
+| `RENAMED` | page | The new label is there; the purpose never moved |
+| `REORDERED` | page | Order is read from the page; the task is unchanged |
+| `WORDING` | page | New button text, and no stored value depends on it |
+| `REMOVED_FIELD` · `REMOVED_STEP` | page | Nothing to supply for something that is gone |
+| `NEW_STEP` | page | Its shape is readable; only required fields can ask |
+| `ROUTE_CHANGED` | page | The new address is where the page was found |
+| `TYPE_CHANGED` | page | A text box tightened into a dropdown is readable |
+| `OPTIONS_CHANGED` | page\* | A longer list is readable |
+| `REQUIRED_RELAXED` | page | Fewer obligations never needs an answer |
+| `NEW_FIELD` | **human** | If required, the page cannot reveal what to type |
+| `REQUIRED_ADDED` | **human** | An optional field left empty can now block the task |
+
+\* `OPTIONS_CHANGED` is the one that escalates. If a list drops the value this
+task relied on, the stored answer is no longer acceptable and filling it would
+**submit an empty field with no error**. That is detected, and the question
+names the withdrawn value and the alternatives rather than asking generically.
+
+The registry lives in [`src/drift-taxonomy.ts`](src/drift-taxonomy.ts) with a
+reason on every row, and a test asserts the detector cannot emit a type the
+registry does not describe.
 
 ## WebMCP
 
