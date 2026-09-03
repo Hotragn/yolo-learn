@@ -18,5 +18,11 @@
       "source": "/((?!api/|assets/).*)",
       "destination": "/index.html"
     }
-  ]
+  ],
+  "functions": {
+    "api/fetch-page.js": {
+      "memory": 1024,
+      "maxDuration": 45
+    }
+  }
 }

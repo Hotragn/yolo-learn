@@ -27,10 +27,10 @@ export function explainReadFailure(raw: string): string {
   if (/too many requests/i.test(t)) {
     return "Too many page reads in the last minute. Wait a moment and try once more."
   }
-  if (/no form control|no readable fields|no form on the first|paste the markup around the fields/i.test(t)) {
+  if (/no form control|no readable fields|no form on the first|paste the markup around the fields|still no form fields after render/i.test(t)) {
     return (
-      "That URL has no form fields in its HTML. Many sites only draw fields with JavaScript, which this read cannot run. " +
-      "Use a page with a real HTML form. The W3C survey example works."
+      "No form fields were found, even after running the page JavaScript. Logged-in apps and OAuth screens will not appear here. " +
+      "Try a public form, or the W3C survey example."
     )
   }
   if (/abort|timed out|timeout/i.test(t)) {

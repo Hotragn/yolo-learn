@@ -15,7 +15,7 @@
   <img src="https://img.shields.io/badge/WebMCP-registerTool-7BD40A?style=flat-square&labelColor=0B1220" alt="WebMCP">
   <img src="https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript">
   <img src="https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=0B1220" alt="React">
-  <img src="https://img.shields.io/badge/tests-222-passing-7BD40A?style=flat-square&labelColor=0B1220" alt="222 tests">
+  <img src="https://img.shields.io/badge/tests-224-passing-7BD40A?style=flat-square&labelColor=0B1220" alt="224 tests">
   <img src="https://img.shields.io/badge/license-MIT-0B1220?style=flat-square" alt="MIT">
 </p>
 
@@ -112,7 +112,7 @@ No flag: the simulated agent at the bottom calls the **same** registered objects
 
 **Northside Family Clinic stays.** Booking plus a real v2 redesign (rename, reorder, new required field, new button) is the heal loop. Inventing a different demo would throw that away.
 
-**Your site:** home page or `#/any` — paste the URL. Optional: click through in another tab, then add those URLs. GET only; it will not POST on a checkout.
+**Your site:** home page or `#/any` — paste the URL. If the first GET has no fields, the fetch function runs the page JavaScript in headless Chrome (read-only) and learns what it drew. It still will not POST or log in.
 
 **Audit:** `#/audit` — W3C’s own before/after pages are the control.
 

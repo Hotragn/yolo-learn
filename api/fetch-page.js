@@ -1,5 +1,6 @@
 import { lookup } from "node:dns/promises"
 import { kvConfigured, kvIncrWithTtl } from "./_kv.js"
+import { hasLearnableControls } from "./_form-detect.js"
 
 /**
  * Fetch a public page so the browser can audit it.
@@ -232,6 +233,29 @@ export default async function handler(req, res) {
 
     let html = await readCapped(response, MAX_HTML_BYTES)
     const notes = []
+
+    // A JS app often ships an empty shell. One headless pass, GET only, then
+    // we read whatever fields the page actually drew.
+    if (!hasLearnableControls(html)) {
+      try {
+        const { renderPublicPage } = await import("./_render.js")
+        const rendered = await renderPublicPage(finalUrl.toString())
+        if (rendered.html) {
+          html = rendered.html.slice(0, MAX_HTML_BYTES)
+          notes.push(
+            hasLearnableControls(html)
+              ? "First GET had no form fields. Ran the page JavaScript in headless Chrome (read-only) and read the drawn DOM."
+              : "Ran the page JavaScript in headless Chrome. Still no form fields after render."
+          )
+        } else if (rendered.error) {
+          notes.push(`JavaScript render skipped: ${rendered.error}`)
+        }
+      } catch (err) {
+        notes.push(
+          `JavaScript render skipped: ${err instanceof Error ? err.message : "headless Chrome is not available here."}`
+        )
+      }
+    }
 
     // Scripts cannot run in the sandbox anyway. Stripping them keeps the
     // console clean and stops any speculative prefetching.

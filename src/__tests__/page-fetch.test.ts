@@ -10,7 +10,7 @@ describe("judge-facing read errors", () => {
 
   it("tells a JS-only site to use an HTML form instead", () => {
     expect(explainReadFailure("No form controls in there. Paste the markup around the fields.")).toMatch(
-      /no form fields in its HTML/i
+      /even after running the page javascript/i
     )
   })
 

@@ -67,14 +67,15 @@ export function LearnUrlPanel({ compact = false }: { compact?: boolean }) {
             <IconRemember size={17} /> Read a public site, then skip the re-read
           </h2>
           <p className="sub">
-            Paste a URL of a page that already has a form in its HTML. GitHub, Google, and most apps send an empty
-            shell, so those will not learn. GET only. Nothing is submitted on the target.
+            Paste a URL. If the first GET has no fields, we run the page JavaScript in headless Chrome (read-only) and
+            learn what it drew. Login, OAuth, and POST are still refused. GitHub-style SPAs that never paint a form
+            will still come back empty.
           </p>
         </>
       ) : (
         <p className="sub">
-          Paste a public HTML form. First visit reads and stores the task. Next visit fetches nothing. JavaScript-only
-          pages will not have fields to learn.
+          Paste a public URL. If the HTML is an empty JavaScript shell, we render it once in headless Chrome, then
+          remember the fields. Next visit fetches nothing.
         </p>
       )}
 
