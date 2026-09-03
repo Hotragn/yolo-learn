@@ -67,7 +67,11 @@ export function Modal({
       <div className="modal" role="dialog" aria-modal="true" aria-labelledby={headingId} ref={ref}>
         <h3 id={headingId}>{title}</h3>
         {children}
-        {escapeHint && <p className="key-hint">Press Esc to {escapeHint}.</p>}
+        {escapeHint && (
+          <p className="key-hint">
+            Press <kbd>Esc</kbd> to {escapeHint}.
+          </p>
+        )}
       </div>
     </div>
   )

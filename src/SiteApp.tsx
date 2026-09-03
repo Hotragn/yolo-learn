@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { fieldName, FieldSpec, getActiveSiteModel, slugify } from "./types"
+import { fieldName, FieldSpec, getActiveSiteModel, siteHash, slugify } from "./types"
 import { valueForField } from "./drift"
-import { setRunExecutor, RunResult } from "./runner"
+import { setRunExecutor, setSiteReset, RunResult } from "./runner"
+import { learnCurrentSite } from "./learn"
 import { logEvent } from "./store"
 import { beginTeaching, useTeach } from "./TeachMode"
 import { Modal } from "./Modal"
+import { IconAlert, IconAuto, IconCheck, IconRecord, IconTerminal, IconTrash } from "./icons"
 
 interface PlanItem {
   stepIndex: number
@@ -51,6 +53,7 @@ export default function SiteApp() {
   const [highlight, setHighlight] = useState(false)
   const [filling, setFilling] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
+  const [learning, setLearning] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
   // Mirrors `confirm` so unmount can settle a pending approval. Leaving the
   // page while the dialog is open would otherwise hang the agent's promise
@@ -68,11 +71,18 @@ export default function SiteApp() {
   }, [])
 
   // Deep link: #/site?teach=1 activates teach mode without an agent.
+  // This has to react to hash changes, not just to mounting: following the
+  // "or demonstrate it yourself" link while already on the site page changes
+  // the hash without remounting, and a mount-only check silently did nothing.
   useEffect(() => {
-    const qs = new URLSearchParams(location.hash.split("?")[1] ?? "")
-    if (qs.get("teach") === "1" && !teach.active && !teach.done) beginTeaching("book_appointment")
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    const check = () => {
+      const qs = new URLSearchParams(location.hash.split("?")[1] ?? "")
+      if (qs.get("teach") === "1" && !teach.active && !teach.done) beginTeaching("book_appointment")
+    }
+    check()
+    window.addEventListener("hashchange", check)
+    return () => window.removeEventListener("hashchange", check)
+  }, [teach.active, teach.done])
 
   // Switching site version rebuilds the wizard, so stale step state cannot
   // point past the end of a shorter flow.
@@ -85,6 +95,13 @@ export default function SiteApp() {
     const t = setTimeout(() => setNotice(null), 8000)
     return () => clearTimeout(t)
   }, [notice])
+
+  // Autonomous discovery walks this wizard, so it needs a way to rewind it
+  // before it starts and to tidy up when it finishes.
+  useEffect(() => {
+    setSiteReset(resetWizard)
+    return () => setSiteReset(null)
+  }, [resetWizard])
 
   const step = site.steps[Math.min(stepIndex, site.steps.length - 1)]
 
@@ -102,12 +119,18 @@ export default function SiteApp() {
           const value = valueForField(flow, params, field)
           if (value == null || value === "") {
             if (field.required) {
+              // Whose problem this is depends on whether the flow exposes the
+              // field as a parameter. Telling an agent to heal a flow when all
+              // it had to do was pass a value sends it down the wrong path.
+              const param = flow.params.find((p) => p.sourceField.fieldPurpose === field.purpose)
               return {
                 ok: false,
                 confirmedByHuman: false,
                 stepsExecuted: 0,
-                needsHealing: true,
-                message: `The site requires "${field.label}" and this flow has no value for it. Heal the flow, then run it again.`,
+                needsHealing: !param,
+                message: param
+                  ? `The site requires "${field.label}". Call this tool again with the "${param.key}" parameter set.`
+                  : `The site requires "${field.label}" and this flow has no value for it. Heal the flow, then run it again.`,
               }
             }
             continue
@@ -267,6 +290,23 @@ export default function SiteApp() {
     resetWizard()
   }
 
+  const learnThisPage = async () => {
+    setLearning(true)
+    setNotice(null)
+    try {
+      const outcome = await learnCurrentSite({ onProgress: (note) => setAgentNote(note) })
+      setAgentNote(null)
+      if (!outcome.ok) {
+        setNotice({ kind: "warn", text: outcome.summary })
+        return
+      }
+      location.hash = "#/tools"
+    } finally {
+      setLearning(false)
+      setAgentNote(null)
+    }
+  }
+
   const teachHint = useMemo(() => {
     if (!teach.active) return null
     const remaining = site.steps.length - 1 - stepIndex
@@ -278,7 +318,10 @@ export default function SiteApp() {
     <div className="site-wrap">
       {site.version === "2.0" && (
         <div className="banner" role="status">
-          <b>We have updated our booking experience.</b> Version {site.version} is now live.
+          <IconAlert size={16} />
+          <span>
+            <b>We have updated our booking experience.</b> Version {site.version} is now live.
+          </span>
         </div>
       )}
       <div className="site-head">
@@ -300,21 +343,49 @@ export default function SiteApp() {
 
       {teach.active && !teach.done && (
         <div className="teach-badge" role="status">
-          <span className="rec" aria-hidden="true" /> Recording your demonstration. {teachHint}
+          <IconRecord className="rec" size={16} />
+          <span>Recording your demonstration. {teachHint}</span>
         </div>
       )}
       {agentNote && (
         <div className="agent-note" role="status">
-          <b>Agent:</b> {agentNote}
+          <IconTerminal size={16} />
+          <span>{agentNote}</span>
         </div>
       )}
       {notice && (
         <div className={notice.kind === "ok" ? "flash" : "flash warn"} role="status">
-          {notice.text}
+          {notice.kind === "ok" ? <IconCheck size={16} /> : <IconAlert size={16} />}
+          <span>{notice.text}</span>
         </div>
       )}
 
-      <div className={"wizard" + (highlight ? " highlight" : "") + (running ? " running" : "")} aria-busy={running}>
+      {!teach.active && !running && (
+        <div className="learn-offer">
+          <div>
+            <b>Learn this page by itself</b>
+            <span>
+              No demonstration. It reads the form, walks the steps with throwaway values, and mints a tool from what
+              it finds. It will not press a button unless that button says "next".
+            </span>
+          </div>
+          <div className="row">
+            <button className="primary" onClick={() => void learnThisPage()} disabled={learning}>
+              <IconAuto size={17} />
+              {learning ? "Reading the page..." : "Learn automatically"}
+            </button>
+            <a className="ghost-link" href={siteHash("teach=1")}>
+              or demonstrate it yourself
+            </a>
+          </div>
+        </div>
+      )}
+
+      <div
+        className={"wizard" + (highlight ? " highlight" : "") + (running ? " running" : "")}
+        aria-busy={running || learning}
+        data-site-version={site.version}
+      >
         <ol className="steps-bar">
           {site.steps.map((s, i) => (
             <li key={s.intent} className={i === stepIndex ? "on" : i < stepIndex ? "done" : ""}>
@@ -425,6 +496,7 @@ export default function SiteApp() {
               Deny
             </button>
             <button className="primary" data-autofocus="true" onClick={() => confirm.resolve(true)}>
+              <IconCheck size={16} />
               Approve and submit
             </button>
           </div>
@@ -485,13 +557,17 @@ function FinalizePanel() {
       </p>
       {chosen.length === 0 && teach.captured.length > 0 && (
         <p className="hint-warn">
-          With nothing ticked, every run books the exact same appointment. Tick at least one value to let the agent vary
-          it.
+          <IconAlert size={15} />
+          <span>
+            With nothing ticked, every run books the exact same appointment. Tick at least one value to let the agent
+            vary it.
+          </span>
         </p>
       )}
 
       <div className="modal-actions">
         <button className="deny" onClick={teach.reset} disabled={teach.minting}>
+          <IconTrash size={16} />
           Discard
         </button>
         <button className="primary" disabled={teach.minting} onClick={() => void teach.finalize(name)}>
