@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://yolo-learn.vercel.app"><img src="https://img.shields.io/badge/live%20demo-yolo--learn.vercel.app-7BD40A?style=flat-square&labelColor=0B1220" alt="Live demo"></a>
-  <img src="https://img.shields.io/badge/tests-194%20passing-7BD40A?style=flat-square&labelColor=0B1220" alt="194 tests passing">
+  <img src="https://img.shields.io/badge/tests-200%20passing-7BD40A?style=flat-square&labelColor=0B1220" alt="200 tests passing">
   <img src="https://img.shields.io/badge/Chrome%20149-7%2F7%20tools%20registered-7BD40A?style=flat-square&labelColor=0B1220" alt="Verified on Chrome 149">
   <img src="https://img.shields.io/badge/dependencies-react%20only-0B1220?style=flat-square" alt="React only">
   <img src="https://img.shields.io/badge/license-MIT-0B1220?style=flat-square" alt="MIT license">
@@ -522,7 +522,7 @@ npm run dev
 | `#/?demo=healed` | Seeded: healed and matching |
 
 ```
-npm test          # 194 unit tests
+npm test          # 200 unit tests
 npm run check:ssrf # 14 SSRF vectors through the real handler
 npm run typecheck
 npm run build
@@ -534,6 +534,12 @@ npm run build
   **Confirmed working.** The banner turns green and reports
   `WebMCP detected on document.modelContext. 7 tool(s) registered with the browser.`
 - **ChatGPT desktop app**: open the deployed URL in the in-app browser.
+  **Confirmed working**, and it found a real bug:
+  [docs/CHATGPT-SESSION.md](docs/CHATGPT-SESSION.md). The tool count went 11 to
+  12 mid-session and the agent saw the minted `clinic_booking` with its full
+  schema and enums, no reload. Native *invocation* crashed on every call until
+  fixed: that implementation passes an options object with no `signal`, and
+  every tool read `.aborted` off it.
 
 Then ask: *"Learn the site, then run the flow you just learned."*
 

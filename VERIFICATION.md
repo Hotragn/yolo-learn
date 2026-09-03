@@ -3,7 +3,7 @@
 **Live:** https://yolo-learn.vercel.app
 **Repo:** https://github.com/Hotragn/yolo-learn (public, MIT)
 
-`npm test` (194 tests), `npm run typecheck`, `npm run build` - all green. Browser
+`npm test` (200 tests), `npm run typecheck`, `npm run build` - all green. Browser
 QA driven through a headless Chromium against the dev server, the local
 production build (`vite preview`), and the live Vercel deployment.
 
@@ -439,6 +439,43 @@ page's key.
 A second, smaller finding: the first browser harness set `input.value` directly,
 which React does not observe, so it silently audited the current page instead of
 the URL. Worth recording because the run *looked* like it passed.
+
+## 6e. ChatGPT in-app browser
+
+Full transcript and analysis: [docs/CHATGPT-SESSION.md](docs/CHATGPT-SESSION.md).
+
+| Claim | Result |
+| --- | --- |
+| Native registration | 11 tools on `document.modelContext` |
+| **Mid-session minting** | **11 to 12 tools. The agent saw `clinic_booking` with full schema and enums, no reload** |
+| Autonomous learning | 4 steps, 5 fields, no demonstration |
+| Approval gate | The agent stopped and asked before submitting, both runs, unprompted |
+| Drift on v2 | 4 changes, 3 automatic, 1 question |
+| Healing | `INS-99812` applied, reran on v2, `Insurance ID` present at the gate |
+| **Native invocation** | **FAILED on every call. Now fixed** |
+
+### The bug it found
+
+`tools.call(...)` threw `Cannot read properties of undefined (reading
+'aborted')` every time. That implementation passes an options object with no
+`signal`; every tool began `aborted(signal)`, reading `.aborted` off undefined.
+The agent silently fell back to clicking the UI, so the run completed and the
+transcript reads as a success. It was not one.
+
+All 194 tests called `execute` exactly as the spec prescribes, which is why none
+caught it. On an experimental API, correct-by-the-spec and
+correct-against-implementations are different properties, and only the second
+one ships.
+
+Fixed with one wrapper at the registration boundary, covering every current and
+future tool. Six tests now call the tools the way the transcript showed they are
+really called, and were verified to fail without the fix.
+
+The same session exposed a UI bug: with theme `system` on a dark OS there is no
+`data-theme` attribute, so an override written as `:root[data-theme="dark"]
+button:hover` never matched, and hover fell through to a hardcoded `#000` while
+the text stayed near-black. Hover now reads a token defined in all three theme
+states.
 
 ## 7. Limitations - what is NOT verified
 
