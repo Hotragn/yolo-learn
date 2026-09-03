@@ -3,7 +3,7 @@
 **Live:** https://yolo-learn.vercel.app
 **Repo:** https://github.com/Hotragn/yolo-learn (public, MIT)
 
-`npm test` (239 tests), `npm run typecheck`, `npm run build` - all green. Browser
+`npm test` (260 tests), `npm run typecheck`, `npm run build` - all green. Browser
 QA driven through a headless Chromium against the dev server, the local
 production build (`vite preview`), and the live Vercel deployment.
 
@@ -526,7 +526,43 @@ button:hover` never matched, and hover fell through to a hardcoded `#000` while
 the text stayed near-black. Hover now reads a token defined in all three theme
 states.
 
-## 15. Limitations - what is NOT verified
+## 15. Handling a signed-in page
+
+The most sensitive input this app accepts is markup captured from a tab the
+user is logged in to. `learnFromHtml` never stores the markup, only the
+extracted shape, so the architecture is the first line. `stripSensitiveMarkup`
+is the second, and it is now written as though it were the only one.
+
+It was 7 lines with no tests and matched only `type="password"` with quotes. It
+would have carried through an unquoted password field, every prefilled `value`
+on a signed-in page, textarea contents, and CSRF and session tokens in hidden
+inputs.
+
+The rule is now subtractive rather than selective: remove every category that
+could carry a person's data and keep only structure. Getting the danger list
+wrong then costs nothing, because the values are already gone.
+
+| Verified | Result |
+| --- | --- |
+| Password fields, however written | Quoted, unquoted, spaced equals, any attribute order |
+| Credential and card autocomplete | All of `current-password`, `new-password`, `cc-number`, `cc-csc`, `one-time-code` |
+| Secret-looking names with no telling type | `cvv`, `card_number`, `ssn`, `session_token`, `otp`, `pin`, `security_answer` |
+| Hidden inputs | Removed entirely; CSRF and session tokens live there |
+| Prefilled values | `value`, `checked` and `selected` all dropped |
+| Textarea content | Emptied; by definition a person typed it |
+| Inline scripts | Removed; they carry bootstrapped user state as JSON |
+| Option values kept | The site's vocabulary, not the user's data, so the shape survives |
+| End to end | A realistic signed-in snapshot reads as a task, and the JSON contains none of `Real Person`, `SW1A 1AA`, `hunter2`, `deadbeef` or the textarea text |
+
+`discover.ts` had kept its own weaker copy of the same patterns, missing
+`token`, `iban`, `auth` and `passcode`. Two hand-maintained copies of a
+security decision drift, and the weaker one silently wins wherever it is used.
+There is now one source of truth and a test asserting the element-level check
+and the markup-level check agree on the same inputs.
+
+21 new tests, written adversarially.
+
+## 16. Limitations - what is NOT verified
 
 Rewritten after the restore, because the previous version had gone stale and
 contradicted three sections of this same document. It claimed the ChatGPT

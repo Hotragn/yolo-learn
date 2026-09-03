@@ -1,4 +1,5 @@
 import { classifySideEffect, FieldSpec, FieldType, slugify, StepSpec } from "./types"
+import { SENSITIVE_AUTOCOMPLETE, SENSITIVE_NAME } from "./sanitize"
 
 /**
  * Autonomous flow discovery.
@@ -196,9 +197,6 @@ function isVisible(el: HTMLElement): boolean {
  * reported, so the flow stops with an explanation instead of quietly
  * capturing a password field's shape.
  */
-const SENSITIVE_AUTOCOMPLETE =
-  /^(current-password|new-password|cc-|one-time-code|cc-number|cc-exp|cc-csc)/i
-const SENSITIVE_NAME = /(password|passwd|pwd|cvv|cvc|card.?number|ssn|secret|otp|pin)/i
 
 export function isSensitive(el: HTMLElement): boolean {
   if (el instanceof HTMLInputElement && el.type === "password") return true
