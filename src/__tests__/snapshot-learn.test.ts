@@ -27,8 +27,10 @@ describe("snapshots from a logged-in tab", () => {
       `<form><label>Order id <input name="order_id" required></label><button>Next</button></form>`
     )
     expect(out.ok).toBe(true)
-    expect(out.toolName).toBe("remembered_portal_example_com")
+    expect(out.toolName).toMatch(/^remembered_portal_example_com_[a-z0-9]{4}$/)
     expect(out.steps[0].fields.map((f) => f.purpose)).toContain("order id")
-    expect(getToolEntries().map((e) => e.tool.name)).toContain("remembered_portal_example_com")
+    expect(getToolEntries().map((e) => e.tool.name)).toEqual(
+      expect.arrayContaining([expect.stringMatching(/^remembered_portal_example_com_[a-z0-9]{4}$/)])
+    )
   })
 })

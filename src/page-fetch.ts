@@ -39,6 +39,12 @@ export function explainReadFailure(raw: string): string {
   if (/could not resolve/i.test(t)) {
     return "That host could not be reached. Check the URL, or use the W3C survey example."
   }
+  // "Failed to fetch" is what a browser says when the request never left, and
+  // it is exactly the bare machinery message this function exists to replace.
+  // Safari phrases the same condition as "Load failed".
+  if (/failed to fetch|networkerror|load failed|network request failed/i.test(t)) {
+    return "The page-read service could not be reached. Check your connection, reload this app, or use the W3C survey example."
+  }
   return raw
 }
 

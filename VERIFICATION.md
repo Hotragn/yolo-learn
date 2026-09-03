@@ -3,7 +3,7 @@
 **Live:** https://yolo-learn.vercel.app
 **Repo:** https://github.com/Hotragn/yolo-learn (public, MIT)
 
-`npm test` (302 tests), `npm run typecheck`, `npm run build` - all green. Browser
+`npm test` (328 tests), `npm run typecheck`, `npm run build` - all green. Browser
 QA driven through a headless Chromium against the dev server, the local
 production build (`vite preview`), and the live Vercel deployment.
 
@@ -605,7 +605,52 @@ refused, not read"; the hand-navigated path did not. Refusing to read something
 is worth saying out loud, or it looks like it was simply missed. Both paths now
 report it.
 
-## 17. Limitations - what is NOT verified
+## 17. Failure messages and tool naming
+
+`page-fetch.ts` and `remembered.ts` were the last two modules with no tests of
+their own. 26 added, which found four defects. All four were live.
+
+### Tool names collided, which registerTool rejects
+
+`toolNameForOrigin` built a name from the hostname alone, dropping the scheme
+and the port, and slugged both `.` and `-` to `_`. Three pairs of genuinely
+different origins produced one name:
+
+| Origins | Both became |
+| --- | --- |
+| `http://example.com` and `https://example.com` | `remembered_example_com` |
+| `localhost:5173` and `localhost:4173` | `remembered_localhost` |
+| `a-b.example.com` and `a.b.example.com` | `remembered_a_b_example_com` |
+
+Not cosmetic: `registerTool` rejects a duplicate with `InvalidStateError`, so
+the second origin either failed to mint or answered with the first one's
+memory. Names now carry a 4-character digest of the full origin, which keeps
+the readable host prefix and makes the name unique without needing to know what
+else is stored. Room for the digest is reserved before truncating at 64, or two
+long hosts would have truncated into the same name again.
+
+**A second bug appeared inside that fix**, caught by the test written for it:
+the first version digested the raw input, so `https://site.com/a/b` and
+`https://site.com` named different tools while sharing one memory. It digests
+the normalised origin now.
+
+### A raw error still reached the user
+
+The module exists so that nobody is shown machinery, and `"Failed to fetch"`
+matched none of its branches, so a browser's own network message passed
+straight through. There is a branch for it now, covering Safari's `Load failed`
+phrasing too.
+
+| Verified | Result |
+| --- | --- |
+| Endpoint down, HTML error page, unparseable body | All three become one sentence, with no `token` or `SyntaxError` in it |
+| Rate limit, timeout, dead host, network down | Four distinct sentences, because the fix differs each time |
+| A clear message is not flattened | The SSRF refusal text passes through verbatim |
+| Every failure offers a way forward | Asserted across all branches |
+| URL encoding | A target containing `?` and `&` yields exactly one query parameter |
+| Naming is stable and registry-safe | Same origin, same name; `^[a-z0-9_]+$`; 64 cap held with a 200-character host |
+
+## 18. Limitations - what is NOT verified
 
 Rewritten after the restore, because the previous version had gone stale and
 contradicted three sections of this same document. It claimed the ChatGPT
