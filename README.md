@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://yolo-learn.vercel.app"><img src="https://img.shields.io/badge/live%20demo-yolo--learn.vercel.app-7BD40A?style=flat-square&labelColor=0B1220" alt="Live demo"></a>
-  <img src="https://img.shields.io/badge/tests-117%20passing-7BD40A?style=flat-square&labelColor=0B1220" alt="117 tests passing">
+  <img src="https://img.shields.io/badge/tests-175%20passing-7BD40A?style=flat-square&labelColor=0B1220" alt="175 tests passing">
   <img src="https://img.shields.io/badge/Chrome%20149-7%2F7%20tools%20registered-7BD40A?style=flat-square&labelColor=0B1220" alt="Verified on Chrome 149">
   <img src="https://img.shields.io/badge/dependencies-react%20only-0B1220?style=flat-square" alt="React only">
   <img src="https://img.shields.io/badge/license-MIT-0B1220?style=flat-square" alt="MIT license">
@@ -320,6 +320,49 @@ the behaviour is specified above but not yet coded.
 
 ---
 
+## Three lenses, not one agent guessing
+
+**[Audit](https://yolo-learn.vercel.app/#/audit)** runs three specialist passes
+over the same DOM. Not a model forming opinions: each one measures something a
+published rule defines, and cites it.
+
+| Lens | Asks | Grounded in |
+| --- | --- | --- |
+| Bug scout | names, ids, form owners, heading outline | WCAG SC 4.1.2, 1.1.1, 3.3.2, 1.3.1, HTML Living Standard |
+| Workflow checker | can the task be completed, is anything committing ungated | house rules, labelled as such |
+| Theme critic | measured contrast, target size, scale consistency | WCAG SC 1.4.3, 2.5.8 |
+
+Every finding says whether its rule is a **standard**, with a link to the spec,
+or **our preference**. Conflating those is the exact false confidence this
+project argues against.
+
+**It refuses to guess.** A gradient behind text makes the ratio genuinely
+uncomputable, so it comes back as `notComputable`, never folded into the pass
+count. Contrast is real WCAG maths including alpha compositing, tested against
+the documented `#767676` / `#777777` boundary on white so it agrees with
+something outside this repo.
+
+Pasted markup is rendered in a **sandboxed iframe with scripts disabled**,
+because contrast and target size need real layout. The markup's own JavaScript
+never runs.
+
+**The memory is a diff.** A second audit of the same page shape reports what
+changed:
+
+```
+Seen before. Compared with 03/09/2026, 02:57:38:
+2 fixed, 0 new, 9 still open
+  fixed: Non-text Content on img
+  fixed: The id attribute must be unique on #dup
+```
+
+**It found a real bug in this project's own palette.** The theme lens measured
+`--ink-faint` at 3.31:1 on the page background and failed it against SC 1.4.3.
+It carries 11px labels, so there is no large-text relaxation to hide behind.
+Fixed in both themes and asserted by test.
+
+Agents get all of it as `audit_page`.
+
 ## "You broke your own site on purpose"
 
 Fair. The clinic is ours and so is its redesign, so of course it survives. The
@@ -376,13 +419,14 @@ npm run dev
 | `#/site?v=2` | The same clinic, one year later |
 | `#/site?teach=1` | Teach mode, when you want your own values remembered |
 | `#/tools` | The live WebMCP registry |
+| `#/audit` | Three lenses over one page |
 | `#/any` | Read a form this app did not write |
 | `#/?demo=learned` | Seeded: just read off the page |
 | `#/?demo=drifted` | Seeded: drift ready to read |
 | `#/?demo=healed` | Seeded: healed and matching |
 
 ```
-npm test          # 117 unit tests
+npm test          # 175 unit tests
 npm run typecheck
 npm run build
 ```

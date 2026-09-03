@@ -16,6 +16,12 @@
  *
  * Background is warm off-white rather than blue-grey, so the whole thing reads
  * closer to paper than to a console.
+ *
+ * --ink-faint was #8a8a80 until this project's own theme lens measured it at
+ * 3.31:1 on the paper and failed it against SC 1.4.3. It carries 11px labels,
+ * which is small text, so 4.5:1 applies with no large-text relaxation. Darkened
+ * to #6f6f66 (4.8:1) and the dark-mode counterpart lightened to #8e9289
+ * (5.6:1). Asserted by test now, so it cannot drift back.
  */
 
 :root {
@@ -23,7 +29,7 @@
 
   --ink: #1a1a17;
   --ink-soft: #5c5c54;
-  --ink-faint: #8a8a80;
+  --ink-faint: #6f6f66;
   --surface: #ffffff;
   --surface-2: #f7f6f2;
   --page: #faf9f5;
@@ -62,7 +68,7 @@
 
     --ink: #f7f8f8;
     --ink-soft: #9b9fa4;
-    --ink-faint: #74787d;
+    --ink-faint: #8e9289;
     --surface: #191914;
     --surface-2: #201f19;
     --page: #0d0d0b;
@@ -92,7 +98,7 @@
   color-scheme: dark;
   --ink: #f7f8f8;
   --ink-soft: #9b9fa4;
-  --ink-faint: #74787d;
+  --ink-faint: #8e9289;
   --surface: #191914;
   --surface-2: #201f19;
   --page: #0d0d0b;
@@ -1263,4 +1269,121 @@ header nav a { white-space: nowrap; }
 @media (max-width: 900px) {
   header { flex-wrap: wrap; row-gap: 8px; }
   header nav { order: 3; width: 100%; overflow-x: auto; }
+}
+
+/* --- audit: three lenses ------------------------------------------------ */
+.orch { width: 100%; height: auto; max-height: 230px; margin: 8px 0 6px; }
+.orch-wire path {
+  fill: none;
+  stroke: var(--border-strong);
+  stroke-width: 1.6;
+  transition: stroke 0.25s ease, stroke-width 0.25s ease;
+}
+.orch-wire path.on { stroke: var(--accent); stroke-width: 2.6; }
+.orch-wire path.was { stroke: var(--accent-edge); }
+.orch-node rect {
+  fill: var(--surface);
+  stroke: var(--border);
+  stroke-width: 1.4;
+  transition: stroke 0.25s ease, fill 0.25s ease;
+}
+.orch-node.on rect { stroke: var(--accent); fill: var(--accent-wash); }
+.orch-node.was rect { stroke: var(--accent-edge); }
+.orch-node text {
+  fill: var(--ink);
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 550;
+  text-anchor: middle;
+}
+.orch-node text.sub { fill: var(--ink-faint); font-size: 10.5px; font-weight: 400; }
+.orch-node.on text.sub { fill: var(--accent-ink); }
+
+.lens-legend {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 6px 0 18px;
+}
+.lens-legend div {
+  border-top: 2px solid var(--border);
+  padding-top: 8px;
+  font-size: 13px;
+}
+.lens-legend b { display: block; margin-bottom: 3px; }
+.lens-legend span { color: var(--ink-soft); }
+.audit-actions { margin-bottom: 16px; }
+
+.lens-report { margin-top: 26px; }
+.lens-report h3 {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 7px;
+}
+.lens-count {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--ink-faint);
+  margin-left: auto;
+}
+.findings { list-style: none; padding: 0; margin: 12px 0 0; }
+.finding {
+  border-left: 3px solid var(--border-strong);
+  padding: 10px 0 10px 13px;
+  margin-bottom: 12px;
+}
+.finding.sev-high { border-left-color: var(--bad); }
+.finding.sev-medium { border-left-color: var(--warn); }
+.finding.sev-low { border-left-color: var(--border-strong); }
+.finding-head { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.sev {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid;
+}
+.sev.high { color: var(--bad); border-color: var(--bad-edge); background: var(--bad-wash); }
+.sev.medium { color: var(--warn); border-color: var(--warn-edge); background: var(--warn-wash); }
+.sev.low { color: var(--ink-faint); border-color: var(--border); background: var(--surface-2); }
+.src { font-size: 11.5px; font-family: var(--mono); text-decoration: none; }
+.src.std { color: var(--accent-ink); border-bottom: 1px dotted var(--accent-edge); }
+.src.house { color: var(--ink-faint); font-style: italic; }
+.corrob {
+  font-size: 11.5px;
+  color: var(--accent-ink);
+  background: var(--accent-wash);
+  border: 1px solid var(--accent-edge);
+  padding: 1px 7px;
+  border-radius: 999px;
+}
+.finding-el { margin: 7px 0 3px; font-size: 13px; display: flex; gap: 12px; flex-wrap: wrap; align-items: baseline; }
+.measured { color: var(--ink-soft); font-size: 12.5px; }
+.finding-detail { margin: 0; font-size: 14px; line-height: 1.5; color: var(--ink-soft); }
+
+.unknowns, .audit-notes, .audit-diff {
+  margin-top: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  padding: 11px 13px;
+  font-size: 13.5px;
+}
+.audit-diff { border-color: var(--accent-edge); background: var(--accent-wash); }
+.unknowns p, .audit-notes p, .audit-diff p {
+  display: flex; gap: 9px; align-items: flex-start; margin: 0;
+}
+.unknowns svg, .audit-notes svg, .audit-diff svg { flex: none; margin-top: 2px; }
+.unknowns ul, .audit-notes ul, .diff-list { margin: 8px 0 0; padding-left: 26px; color: var(--ink-soft); }
+.unknowns li, .audit-notes li, .diff-list li { margin: 4px 0; }
+.diff-list { list-style: none; padding-left: 26px; }
+.diff-list svg { color: var(--accent-ink); vertical-align: -2px; }
+
+@media (max-width: 760px) {
+  .lens-legend { grid-template-columns: 1fr; }
 }

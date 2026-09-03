@@ -31,6 +31,7 @@ import { AgentConsole } from "./AgentConsole"
 import { Modal } from "./Modal"
 import SiteApp from "./SiteApp"
 import { AnyForm } from "./AnyForm"
+import { Audit } from "./Audit"
 import { hasSeenTour, markTourSeen, Tour } from "./Tour"
 import {
   IconAlert,
@@ -171,6 +172,9 @@ export default function App() {
             <a href="#/tools" aria-current={path === "/tools"} data-tour="nav-tools">
               Agent tools
             </a>
+            <a href="#/audit" aria-current={path === "/audit"} data-tour="nav-audit">
+              Audit
+            </a>
             <a href="#/any" aria-current={path === "/any"} data-tour="nav-any">
               Try your own
             </a>
@@ -201,7 +205,9 @@ export default function App() {
           </p>
         )}
 
-        {path === "/any" ? (
+        {path === "/audit" ? (
+          <Audit />
+        ) : path === "/any" ? (
           <AnyForm />
         ) : path === "/site" ? (
           <SiteApp />

@@ -3,7 +3,7 @@
 **Live:** https://yolo-learn.vercel.app
 **Repo:** https://github.com/Hotragn/yolo-learn (public, MIT)
 
-`npm test` (117 tests), `npm run typecheck`, `npm run build` - all green. Browser
+`npm test` (175 tests), `npm run typecheck`, `npm run build` - all green. Browser
 QA driven through a headless Chromium against the dev server, the local
 production build (`vite preview`), and the live Vercel deployment.
 
@@ -284,6 +284,35 @@ that is nothing but credentials.
 
 Not claimed: it cannot walk a wizard from markup alone, and it cannot register a
 tool on another origin's document. Both are stated on the page.
+
+## 6d. Three lenses
+
+Deterministic passes, each citing a published rule or openly labelled a
+preference. No model, no opinions dressed as measurements.
+
+| Property | How it was verified |
+| --- | --- |
+| Contrast maths agrees with something outside this repo | Asserted against the documented `#767676` (4.54:1, passes) and `#777777` (4.48:1, fails) boundary on white, plus 21:1 black-on-white and 1:1 identity |
+| Uses WCAG's transfer function, not sRGB's | A channel at 10/255 sits between the 0.03928 and 0.04045 thresholds, so which branch is taken is observable, and it is asserted |
+| Alpha is composited | 50% black on white is asserted to differ from black on white |
+| Accessible name follows the ARIA order | aria-labelledby beats aria-label beats label beats title beats placeholder, each asserted |
+| Uncomputable is never a pass | A gradient behind text returns unknown with a reason |
+| Layout-dependent checks decline without layout | In jsdom the theme lens produces no findings and says why |
+| Pasted markup gets real layout | Rendered in an iframe sandboxed WITHOUT allow-scripts. The browser console confirms script execution was blocked, so the markup's own JS never ran |
+| Contrast through that frame is correct | #aaaaaa on white measured 2.32:1 in the browser, matching hand calculation to two decimals |
+| Memory is a diff | Second run: 0 fixed, 0 new, 11 still open. After fixing an alt and a duplicate id: 2 fixed, naming both |
+| Standards and preferences stay distinguishable | Asserted: every house rule has an empty URL, every standard has an https one |
+
+**It found two real bugs in this project.**
+
+1. `--ink-faint` measured 3.31:1 on the page background, failing SC 1.4.3 for
+   small text. Fixed to 4.8:1 light and 5.6:1 dark, and the broken values are
+   now asserted to fail so they cannot return.
+2. The audit memory was stored under `audit.v1`, the key `store.ts` already
+   uses for the audit trail. They overwrote each other, so the diff never fired
+   and the trail was being corrupted. Namespaced to `audit.lenses.v1`.
+
+Self-audit after the palette fix reports **0 high-severity contrast failures**.
 
 ## 7. Limitations - what is NOT verified
 

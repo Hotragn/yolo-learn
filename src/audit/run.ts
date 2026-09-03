@@ -1,0 +1,194 @@
+import { safeGetItem, safeSetItem } from "../types"
+import { Finding, Lens, LensReport, runLenses } from "./lenses"
+
+/**
+ * Running the lenses, and remembering what they found.
+ *
+ * Two things here are load-bearing.
+ *
+ * First, contrast and target size need LAYOUT. A document from DOMParser has
+ * no view, so getComputedStyle resolves nothing and getBoundingClientRect
+ * returns zeroes - which is exactly why the theme lens declines to guess on
+ * parsed markup. To measure pasted HTML properly it has to be rendered, so it
+ * goes into a sandboxed iframe with scripts disabled: real layout, real
+ * cascade, and the pasted page's own JavaScript never runs.
+ *
+ * Second, the memory is a diff, not a cache of prose. A second audit of the
+ * same page reports what got fixed, what is new, and what is still open. That
+ * is the part that makes a second run cheaper than the first, and it is
+ * checkable rather than asserted.
+ */
+
+export interface AuditResult {
+  reports: LensReport[]
+  totals: { findings: number; unknowns: number; checked: number; corroborated: number }
+  bySeverity: { high: number; medium: number; low: number }
+  /** Present from the second audit of the same page onwards. */
+  diff?: AuditDiff
+  notes: string[]
+}
+
+export interface AuditDiff {
+  previousAt: string
+  fixed: Finding[]
+  appeared: Finding[]
+  stillOpen: number
+}
+
+// NOT "audit.v1": store.ts already owns that key for the audit trail, and the
+// two silently overwrote each other. The diff never fired and the trail was
+// being corrupted, which is a good argument for namespacing storage keys by
+// the module that owns them.
+const MEMORY_KEY = "audit.lenses.v1"
+
+/** A finding's identity, stable across runs so a diff means something. */
+function identity(f: Finding): string {
+  return `${f.rule.id}|${f.element}`
+}
+
+interface StoredAudit {
+  at: string
+  ids: string[]
+  findings: Finding[]
+}
+
+type Memory = Record<string, StoredAudit>
+
+function loadMemory(): Memory {
+  try {
+    const parsed = JSON.parse(safeGetItem(MEMORY_KEY) ?? "{}")
+    return parsed && typeof parsed === "object" ? (parsed as Memory) : {}
+  } catch {
+    return {}
+  }
+}
+
+export function rememberAudit(key: string, findings: Finding[]) {
+  const memory = loadMemory()
+  memory[key] = { at: new Date().toISOString(), ids: findings.map(identity), findings }
+  safeSetItem(MEMORY_KEY, JSON.stringify(memory))
+}
+
+export function recallAudit(key: string): StoredAudit | null {
+  return loadMemory()[key] ?? null
+}
+
+export function forgetAudits() {
+  safeSetItem(MEMORY_KEY, "{}")
+}
+
+export function auditMemoryKeys(): { key: string; at: string; findings: number }[] {
+  return Object.entries(loadMemory()).map(([key, v]) => ({ key, at: v.at, findings: v.ids.length }))
+}
+
+/**
+ * A key that changes when the page's structure changes but not when its content
+ * does, so revisiting the same page is a hit and a redesign is a miss.
+ */
+export function auditKey(doc: Document, label: string): string {
+  const shape = [...doc.querySelectorAll("form, input, select, textarea, button, h1, h2, h3")]
+    .map((el) => `${el.tagName}${el.getAttribute("name") ?? ""}${(el as HTMLInputElement).type ?? ""}`)
+    .join(">")
+  let hash = 0
+  for (let i = 0; i < shape.length; i++) hash = (hash * 31 + shape.charCodeAt(i)) | 0
+  return `${label}#${(hash >>> 0).toString(36)}`
+}
+
+function summarise(reports: LensReport[], notes: string[], diff?: AuditDiff): AuditResult {
+  const findings = reports.flatMap((r) => r.findings)
+  return {
+    reports,
+    totals: {
+      findings: findings.length,
+      unknowns: reports.reduce((n, r) => n + r.unknowns.length, 0),
+      checked: reports.reduce((n, r) => n + r.checked, 0),
+      corroborated: findings.filter((f) => f.corroboratedBy?.length).length,
+    },
+    bySeverity: {
+      high: findings.filter((f) => f.severity === "high").length,
+      medium: findings.filter((f) => f.severity === "medium").length,
+      low: findings.filter((f) => f.severity === "low").length,
+    },
+    diff,
+    notes: [...notes, ...reports.flatMap((r) => r.notes)],
+  }
+}
+
+function diffAgainst(previous: StoredAudit | null, findings: Finding[]): AuditDiff | undefined {
+  if (!previous) return undefined
+  const now = new Set(findings.map(identity))
+  const before = new Set(previous.ids)
+  return {
+    previousAt: previous.at,
+    fixed: previous.findings.filter((f) => !now.has(identity(f))),
+    appeared: findings.filter((f) => !before.has(identity(f))),
+    stillOpen: findings.filter((f) => before.has(identity(f))).length,
+  }
+}
+
+export interface RunOptions {
+  lenses?: Lens[]
+  /** Label for the memory key. The origin for a live page, a name for pasted HTML. */
+  label?: string
+  remember?: boolean
+}
+
+/** Audit the live document. */
+export function auditDocument(doc: Document, options: RunOptions = {}): AuditResult {
+  const lenses = options.lenses ?? ["bugs", "workflow", "theme"]
+  const label = options.label ?? location.origin + location.pathname
+  const reports = runLenses(doc, lenses)
+  const findings = reports.flatMap((r) => r.findings)
+  const key = auditKey(doc, label)
+  const diff = diffAgainst(recallAudit(key), findings)
+  if (options.remember !== false) rememberAudit(key, findings)
+  return summarise(reports, [], diff)
+}
+
+/**
+ * Audit a string of HTML by rendering it first.
+ *
+ * The iframe is sandboxed WITHOUT allow-scripts, so nothing in the pasted
+ * markup executes. allow-same-origin is needed to read the resulting document,
+ * and is safe precisely because scripts are off.
+ */
+export async function auditHTML(html: string, options: RunOptions = {}): Promise<AuditResult> {
+  const frame = document.createElement("iframe")
+  frame.setAttribute("sandbox", "allow-same-origin")
+  frame.setAttribute("aria-hidden", "true")
+  frame.setAttribute("tabindex", "-1")
+  // Off-screen but genuinely laid out: display:none would take layout away and
+  // put us back to guessing.
+  frame.style.cssText =
+    "position:fixed;left:-10000px;top:0;width:1280px;height:900px;border:0;visibility:hidden;"
+  frame.srcdoc = html
+
+  const ready = new Promise<void>((resolve) => {
+    frame.addEventListener("load", () => resolve(), { once: true })
+    // srcdoc on a detached frame can settle before the listener attaches.
+    setTimeout(resolve, 1200)
+  })
+
+  document.body.appendChild(frame)
+  try {
+    await ready
+    const doc = frame.contentDocument
+    if (!doc || !doc.body) {
+      return summarise([], ["The pasted markup could not be rendered, so nothing was measured."])
+    }
+    const lenses = options.lenses ?? ["bugs", "workflow", "theme"]
+    const reports = runLenses(doc, lenses)
+    const findings = reports.flatMap((r) => r.findings)
+    const label = options.label ?? "pasted"
+    const key = auditKey(doc, label)
+    const diff = diffAgainst(recallAudit(key), findings)
+    if (options.remember !== false) rememberAudit(key, findings)
+
+    return summarise(reports, [
+      "Rendered in a sandboxed frame with scripts disabled, so layout and the cascade are real and the pasted page's own JavaScript never ran.",
+      "Inline styles and <style> blocks apply. A stylesheet linked by a relative URL will not resolve, so some colours may differ from the real site.",
+    ], diff)
+  } finally {
+    frame.remove()
+  }
+}

@@ -37,6 +37,7 @@ import { coerceValue, getActiveSiteModel, TaughtFlow } from "./types"
 import { getFlow, loadFlows, logEvent, patchFlow } from "./store"
 import { detectDrift, effectiveStatus, healFlow, storedValue } from "./drift"
 import { loadRun, normalizeParams, runFlowInteractive } from "./runner"
+import { auditDocument } from "./audit/run"
 import { beginTeaching } from "./TeachMode"
 
 export interface ToolAnnotations {
@@ -488,6 +489,71 @@ export async function registerStaticTools(): Promise<void> {
         // How many times a page teardown interrupted it and it carried on.
         resumedAfterTeardown: run.resumeCount,
         startedAt: run.startedAt,
+      }
+    },
+  })
+
+  await registerTool({
+    name: "audit_page",
+    description:
+      "Run three specialist passes over the page currently on screen and return their findings. The bug scout checks " +
+      "structure and semantics, the workflow checker asks whether the task can actually be completed, and the theme " +
+      "critic measures contrast and target sizes. Every finding cites the rule that produced it and says whether that " +
+      "rule is a published standard or a preference of this app's. Anything not computable is returned as unknown " +
+      "rather than as a pass. A second call on the same page shape returns a diff against the first.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        lenses: {
+          type: "array",
+          description: "Which passes to run. Defaults to all three.",
+          items: { type: "string", enum: ["bugs", "workflow", "theme"] },
+        },
+      },
+    },
+    annotations: { readOnlyHint: true, untrustedContentHint: true },
+    execute: async (args, { signal }) => {
+      const bad = aborted(signal)
+      if (bad) return bad
+      const requested = Array.isArray(args.lenses)
+        ? (args.lenses as unknown[]).filter(
+            (l): l is "bugs" | "workflow" | "theme" => l === "bugs" || l === "workflow" || l === "theme"
+          )
+        : undefined
+      const out = auditDocument(document, {
+        lenses: requested?.length ? requested : undefined,
+        label: location.origin + location.pathname,
+      })
+      return {
+        summary:
+          `${out.totals.findings} finding(s) from ${out.totals.checked} checks: ` +
+          `${out.bySeverity.high} high, ${out.bySeverity.medium} medium, ${out.bySeverity.low} low. ` +
+          `${out.totals.unknowns} not computable. ${out.totals.corroborated} corroborated by a second lens.` +
+          (out.diff
+            ? ` Seen before: ${out.diff.fixed.length} fixed, ${out.diff.appeared.length} new, ${out.diff.stillOpen} still open.`
+            : " First look at this page shape."),
+        totals: out.totals,
+        bySeverity: out.bySeverity,
+        lenses: out.reports.map((r) => ({
+          lens: r.lens,
+          checked: r.checked,
+          findings: r.findings.map((f) => ({
+            severity: f.severity,
+            rule: f.rule.id,
+            ruleName: f.rule.name,
+            source: f.rule.source,
+            standard: f.rule.source !== "house rule",
+            element: f.element,
+            detail: f.detail,
+            measured: f.measured,
+            threshold: f.threshold,
+            corroboratedBy: f.corroboratedBy,
+          })),
+          notComputable: r.unknowns.map((u) => ({ element: u.element, why: u.detail })),
+          notes: r.notes,
+        })),
+        diff: out.diff,
+        limits: out.notes,
       }
     },
   })
