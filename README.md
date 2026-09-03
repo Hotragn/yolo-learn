@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://yolo-learn.vercel.app"><img src="https://img.shields.io/badge/live%20demo-yolo--learn.vercel.app-7BD40A?style=flat-square&labelColor=0B1220" alt="Live demo"></a>
-  <img src="https://img.shields.io/badge/tests-73%20passing-7BD40A?style=flat-square&labelColor=0B1220" alt="73 tests passing">
+  <img src="https://img.shields.io/badge/tests-85%20passing-7BD40A?style=flat-square&labelColor=0B1220" alt="85 tests passing">
   <img src="https://img.shields.io/badge/Chrome%20149-7%2F7%20tools%20registered-7BD40A?style=flat-square&labelColor=0B1220" alt="Verified on Chrome 149">
   <img src="https://img.shields.io/badge/dependencies-react%20only-0B1220?style=flat-square" alt="React only">
   <img src="https://img.shields.io/badge/license-MIT-0B1220?style=flat-square" alt="MIT license">
@@ -18,11 +18,35 @@
 
 <p align="center">
   <a href="https://yolo-learn.vercel.app"><strong>Open the live demo</strong></a> ·
-  <a href="#the-loop-in-ninety-seconds">The loop</a> ·
   <a href="#architecture">Architecture</a> ·
+  <a href="#recall-the-whole-thing-is-a-cache">The cache</a> ·
   <a href="#reaching-a-site-it-does-not-own">Scaling to real sites</a> ·
   <a href="VERIFICATION.md">What was verified</a>
 </p>
+
+---
+
+## Sixty seconds
+
+<p align="center">
+  <img src="docs/demo.gif" alt="The whole loop: cache miss, read the page, cache hit, run, redesign, cache stale, heal, run green" width="100%">
+</p>
+
+Nine beats, unedited, sped up about two and a half times. Every one is a real
+tool call against real storage, which is why it stops twice and waits for the
+approval dialog. Press **Run the guided demo** on the live site to watch it
+yourself. ([higher quality mp4](docs/demo.mp4))
+
+**Or skip straight to any beat**, no setup:
+
+| Link | Lands you on |
+| --- | --- |
+| [`#/?demo=learned`](https://yolo-learn.vercel.app/#/?demo=learned) | a flow it has just read off the page |
+| [`#/?demo=drifted`](https://yolo-learn.vercel.app/#/?demo=drifted) | **the payoff**: 4 changes detected, 1 question |
+| [`#/?demo=healed`](https://yolo-learn.vercel.app/#/?demo=healed) | healed and matching the redesigned site |
+
+Those links do not fake anything. They run the real learn and heal path and then
+drop you at the result.
 
 ---
 
@@ -54,6 +78,42 @@ as terminal and left alone.
 at page load. Minting one at runtime and having a live agent call it with no
 reload is the actual new capability, and it is the part that took reading the
 spec properly to get right.
+
+---
+
+## Recall: the whole thing is a cache
+
+The clearest way to describe this is not "it heals". It is **a cache with
+revalidation**, and every behaviour falls out of that:
+
+| State | Means | What it costs |
+| --- | --- | --- |
+| **miss** | Nothing known for this origin | Read the page. `learn_site` |
+| **hit** | Known, and the page still fingerprints the same | **Nothing.** No re-reading, no diffing, nothing to ask |
+| **stale** | Known, but the page fingerprints differently | Revalidate. `heal_flow`, and at most one question |
+
+The cache key is `(origin, structure fingerprint)`. The fingerprint is the
+ETag: an FNV-1a digest of step order, intents, button labels, and each field's
+purpose, type, requiredness and option list.
+
+What it deliberately leaves out is **labels**. Renaming `Your name` to
+`Full name (as on insurance card)` does not change the fingerprint, because a
+rename is not a different task, it is drift the engine heals from the page
+itself. Adding a required field, reordering steps or changing an option list
+does change it.
+
+```
+recall_page  ->  { state: "miss",  nextStep: "learn_site" }
+             ->  { state: "hit",   nextStep: "run it, nothing to re-read" }
+             ->  { state: "stale", changes: [...], questions: [...] }
+```
+
+`recall_page` is the tool an agent should call **first** on any page, before
+`learn_site`. Healing refreshes the fingerprint, so a healed flow goes straight
+back to being a hit rather than staying permanently stale.
+
+This is also what stops the obvious bug: before recall existed, visiting the
+demo site twice would happily read it again and mint a duplicate flow.
 
 ---
 
@@ -129,7 +189,9 @@ Answer it. Run again. Green.
 | [`learn.ts`](src/learn.ts) | Turns a discovery into a flow and a tool |
 | [`webmcp.ts`](src/webmcp.ts) | The verified WebMCP layer |
 | [`runner.ts`](src/runner.ts) | Run orchestration and untrusted-argument handling |
+| [`recall.ts`](src/recall.ts) | The cache lookup: miss, hit or stale |
 | [`store.ts`](src/store.ts) | The semantic map, in `localStorage` |
+| [`guided.ts`](src/guided.ts) | The guided run and the seeded deep links |
 | [`SiteApp.tsx`](src/SiteApp.tsx) | The demo clinic and the on-screen executor |
 
 `discover.ts` importing the site model would make the whole claim a lie, so it
@@ -185,6 +247,11 @@ the behaviour is specified above but not yet coded.
 
 | Case | Status | Behaviour |
 | --- | --- | --- |
+| Revisit a page already known | Handled | Cache hit. Offers to run it, not to learn it again |
+| Revisit a page that changed | Handled | Cache stale. Offers to heal it |
+| Healed flow revisited | Handled | Back to a hit. Healing refreshes the fingerprint |
+| Flow stored before origins existed | Handled | Treated as belonging here rather than orphaned |
+| Flow learned on another origin | Handled | Ignored by recall on this one |
 | Learn the same site twice | Handled | Second tool becomes `clinic_booking_2`, no `InvalidStateError` |
 | Learn a layout never seen before | Handled | Verified on v2: 6 fields in the new order |
 | Page has no form | Handled | Reported, not thrown |
@@ -226,9 +293,12 @@ npm run dev
 | `#/site?v=2` | The same clinic, one year later |
 | `#/site?teach=1` | Teach mode, when you want your own values remembered |
 | `#/tools` | The live WebMCP registry |
+| `#/?demo=learned` | Seeded: just read off the page |
+| `#/?demo=drifted` | Seeded: drift ready to read |
+| `#/?demo=healed` | Seeded: healed and matching |
 
 ```
-npm test          # 73 unit tests
+npm test          # 85 unit tests
 npm run typecheck
 npm run build
 ```
@@ -272,6 +342,7 @@ the human owns the submit.
 
 | Tool | What it does |
 | --- | --- |
+| `recall_page` | **Do I already know this page?** miss, hit or stale. Call this first |
 | `learn_site` | **Learn this page autonomously.** No demonstration |
 | `list_flows` | What is known, with health and parameters |
 | `check_flow_health` | Plain-English drift report and any questions |
