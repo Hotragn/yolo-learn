@@ -279,6 +279,12 @@ export async function readPagesInOrder(
   }
 
   notes.push("Read-only: GET requests only, from the pages you listed. Nothing submitted.")
+  // The auto-walk says this and the hand-navigated trail did not, so pasting a
+  // sign-in page dropped its password field silently. Refusing to read
+  // something is worth saying out loud, or it looks like it was simply missed.
+  if (steps.some((s) => s.refused.length)) {
+    notes.push("Credential and payment fields were refused, not read.")
+  }
   if (steps.length === 0 && /no readable form/i.test(notes.join(" "))) {
     stoppedBecause = explainReadFailure("No form controls in there.")
   }

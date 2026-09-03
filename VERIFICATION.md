@@ -3,7 +3,7 @@
 **Live:** https://yolo-learn.vercel.app
 **Repo:** https://github.com/Hotragn/yolo-learn (public, MIT)
 
-`npm test` (260 tests), `npm run typecheck`, `npm run build` - all green. Browser
+`npm test` (302 tests), `npm run typecheck`, `npm run build` - all green. Browser
 QA driven through a headless Chromium against the dev server, the local
 production build (`vite preview`), and the live Vercel deployment.
 
@@ -562,7 +562,50 @@ and the markup-level check agree on the same inputs.
 
 21 new tests, written adversarially.
 
-## 16. Limitations - what is NOT verified
+## 16. Site memory and the hand-navigated trail
+
+`remote.ts` (290 lines) and `readPagesInOrder` shipped with no tests. 42 added,
+and they found a real inconsistency.
+
+### Memory keyed on shape, not on bytes
+
+| Verified | Result |
+| --- | --- |
+| Same shape, same fingerprint | Stable across a structural clone |
+| A relabelled field does not invalidate it | Rename is drift the engine heals, so the fingerprint holds |
+| Field order within a step is ignored | Reversing two fields leaves the fingerprint unchanged |
+| A changed purpose does move it | That is the task actually moving |
+| `recall_url` never fetches | Asserted: zero calls to the fetcher on a hit, a miss, or junk input |
+| Second visit costs nothing | `cached:true`, `bytesRead:0`, zero fetches |
+| `force` re-reads | Fetches again and reports `CHANGED` when the shape moved |
+| Wording-only change | Explicitly does **not** report a change |
+| Failure stores nothing | A 403 leaves no memory behind rather than an empty one |
+| Bounded | 45 origins learned, 40 kept |
+| Corrupt storage | Returns empty rather than throwing |
+| Signed-in snapshot | Stores the shape; `Real Person`, `hunter2`, `deadbeef`, `<form` and `<input` are all absent from localStorage, and nothing is sent anywhere |
+
+### The trail, where a person pastes the URLs they visited
+
+| Verified | Result |
+| --- | --- |
+| Order is the user's | Steps come back in the pasted order, not a re-derived one |
+| Will not leave the first origin | An off-origin URL mid-list is never fetched, and is noted |
+| Capped | 20 URLs pasted, at most 8 fetched |
+| Deduped | A repeated URL is read once |
+| Junk lines | Skipped with a note; only a bad *first* line stops it, since it sets the origin |
+| Redirect off-origin | Dropped after the fetch, with a note |
+| Non-form pages | Noted, and the rest of the trail still reads |
+| Read-only claim | Every result states GET-only and nothing submitted |
+
+### The inconsistency it found
+
+Pasting a sign-in page refused the password field, correctly, and then said
+nothing about it. The auto-walk reports "Credential and payment fields were
+refused, not read"; the hand-navigated path did not. Refusing to read something
+is worth saying out loud, or it looks like it was simply missed. Both paths now
+report it.
+
+## 17. Limitations - what is NOT verified
 
 Rewritten after the restore, because the previous version had gone stale and
 contradicted three sections of this same document. It claimed the ChatGPT
