@@ -1,8 +1,19 @@
 import { useCallback, useState } from "react"
 import { Finding, Lens, LensReport } from "./audit/lenses"
-import { auditDocument, auditHTML, AuditResult, auditUrl, forgetAudits } from "./audit/run"
+import {
+  auditDocument,
+  auditHTML,
+  AuditResult,
+  auditKey,
+  auditUrl,
+  contributeSharedMemory,
+  forgetAudits,
+  readSharedMemory,
+  SharedMemory,
+  splitAuditKey,
+} from "./audit/run"
 import { logEvent } from "./store"
-import { IconAlert, IconCheck, IconDrift, IconHeal, IconRead, IconRefuse, IconRun } from "./icons"
+import { IconAlert, IconCheck, IconDrift, IconHeal, IconRead, IconRefuse, IconRemember, IconRun } from "./icons"
 
 const LENS_META: Record<Lens, { title: string; job: string }> = {
   bugs: { title: "Bug scout", job: "structure and semantics: names, ids, form owners, heading outline" },
@@ -140,6 +151,7 @@ export function Audit() {
   const [html, setHtml] = useState(SAMPLE)
   const [url, setUrl] = useState("")
   const [busy, setBusy] = useState(false)
+  const [shared, setShared] = useState<SharedMemory | null>(null)
 
   // Reveal the lenses one at a time. They are fast enough to finish in a frame,
   // and a report that appears instantly hides which lens said what.
@@ -175,6 +187,20 @@ export function Audit() {
     try {
       const out = await auditUrl(url.trim())
       logEvent("learn", `Audited ${url.trim()}: ${out.totals.findings} finding(s)`)
+
+      // Shared memory is a hint about a page shape, so it only makes sense for
+      // a real origin. splitAuditKey refuses anything else.
+      const parts = out.page?.finalUrl
+        ? splitAuditKey(auditKey(document, new URL(out.page.finalUrl).origin))
+        : null
+      if (parts) {
+        const before = await readSharedMemory(parts.origin, parts.fingerprint)
+        setShared(before)
+        void contributeSharedMemory(parts.origin, parts.fingerprint, out)
+      } else {
+        setShared(null)
+      }
+
       await reveal(out)
     } finally {
       setBusy(false)
@@ -321,6 +347,39 @@ export function Audit() {
                   ))}
                 </ul>
               )}
+            </div>
+          )}
+
+          {shared && (
+            <div className={"shared-mem" + (shared.configured ? "" : " off")}>
+              <p>
+                <IconRemember size={17} />
+                {shared.configured && shared.record ? (
+                  <span>
+                    <b>
+                      This page shape has been audited {shared.record.audits}{" "}
+                      time{shared.record.audits === 1 ? "" : "s"} before
+                    </b>
+                    , most recently {new Date(shared.record.lastAt).toLocaleString()}. Commonly trips:{" "}
+                    {Object.entries(shared.record.rules)
+                      .sort((a, b) => b[1] - a[1])
+                      .slice(0, 4)
+                      .map(([id, n]) => `${id} (${n})`)
+                      .join(", ")}
+                    . A hint only: the lenses above re-ran from scratch.
+                  </span>
+                ) : shared.configured ? (
+                  <span>
+                    <b>Nobody has audited this page shape before.</b> The next person to look will see that you did,
+                    as counts against rule ids and nothing else.
+                  </span>
+                ) : (
+                  <span>
+                    <b>No shared store on this deployment</b>, so audits are remembered in your browser only.{" "}
+                    {shared.reason}
+                  </span>
+                )}
+              </p>
             </div>
           )}
 

@@ -1417,3 +1417,15 @@ header nav a { white-space: nowrap; }
 .proof .any-table td { border-bottom-color: var(--accent-edge); }
 .proof .any-table td small { color: var(--ink-faint); }
 .proof .explain-note { margin-top: 12px; }
+
+.shared-mem {
+  margin-top: 14px;
+  border: 1px solid var(--accent-edge);
+  background: var(--accent-wash);
+  border-radius: var(--radius-sm);
+  padding: 11px 13px;
+  font-size: 13.5px;
+}
+.shared-mem.off { border-color: var(--border); background: var(--surface-2); color: var(--ink-soft); }
+.shared-mem p { display: flex; gap: 9px; align-items: flex-start; margin: 0; }
+.shared-mem svg { flex: none; margin-top: 2px; }

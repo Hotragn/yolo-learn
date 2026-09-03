@@ -1,4 +1,5 @@
 import { lookup } from "node:dns/promises"
+import { kvConfigured, kvIncrWithTtl } from "./_kv.js"
 
 /**
  * Fetch a public page so the browser can audit it.
@@ -165,6 +166,19 @@ const RATE_WINDOW_MS = 60_000
 const RATE_MAX = 20
 const hits = new Map()
 
+/**
+ * Prefer the shared store, because a per-instance counter on a platform that
+ * scales out is a floor rather than a limit. Falls back to the in-memory one
+ * when no store is configured, so the endpoint is never left unmetered.
+ */
+async function overLimit(key) {
+  if (kvConfigured()) {
+    const count = await kvIncrWithTtl(`rl:fetch:${key}`, RATE_WINDOW_MS / 1000)
+    if (count !== null) return count > RATE_MAX
+  }
+  return rateLimited(key)
+}
+
 function rateLimited(key) {
   const now = Date.now()
   const seen = (hits.get(key) ?? []).filter((t) => now - t < RATE_WINDOW_MS)
@@ -184,7 +198,7 @@ export default async function handler(req, res) {
 
   const client =
     (req.headers?.["x-forwarded-for"] ?? "").toString().split(",")[0].trim() || "unknown"
-  if (rateLimited(client)) {
+  if (await overLimit(client)) {
     res.status(429).json({
       error: "Too many requests from this address in the last minute. Wait a moment and try again.",
     })

@@ -255,3 +255,70 @@ export async function auditUrl(url: string, options: RunOptions = {}): Promise<A
     ],
   }
 }
+
+
+// --- shared memory ------------------------------------------------------
+
+export interface SharedRecord {
+  audits: number
+  lastAt: string
+  lastCounts: { high: number; medium: number; low: number }
+  rules: Record<string, number>
+}
+
+export interface SharedMemory {
+  configured: boolean
+  reason?: string
+  record?: SharedRecord | null
+}
+
+/**
+ * What previous audits of this page shape found, across everyone.
+ *
+ * A hint and nothing more: the lenses always re-run locally, and none of this
+ * is ever shown as a finding. It exists so the second person to look at a page
+ * knows it has been looked at, and what it usually trips on.
+ *
+ * Every failure path returns "not configured" rather than throwing, so a
+ * missing or broken store costs nothing.
+ */
+export async function readSharedMemory(origin: string, fingerprint: string): Promise<SharedMemory> {
+  try {
+    const response = await fetch(
+      `/api/memory?origin=${encodeURIComponent(origin)}&fingerprint=${encodeURIComponent(fingerprint)}`
+    )
+    if (!response.ok) return { configured: false }
+    return (await response.json()) as SharedMemory
+  } catch {
+    return { configured: false }
+  }
+}
+
+/** Contribute rule ids and counts. Never element text, never anything personal. */
+export async function contributeSharedMemory(
+  origin: string,
+  fingerprint: string,
+  result: AuditResult
+): Promise<void> {
+  try {
+    const ruleIds = [...new Set(result.reports.flatMap((r) => r.findings.map((f) => f.rule.id)))]
+    await fetch("/api/memory", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ origin, fingerprint, ruleIds, counts: result.bySeverity }),
+    })
+  } catch {
+    // A store that is unreachable must not break an audit that already worked.
+  }
+}
+
+/** Split an audit key back into the two parts the endpoint validates. */
+export function splitAuditKey(key: string): { origin: string; fingerprint: string } | null {
+  const hash = key.lastIndexOf("#")
+  if (hash < 0) return null
+  const origin = key.slice(0, hash)
+  const fingerprint = key.slice(hash + 1)
+  if (!/^https?:\/\/[a-z0-9.-]+(:\d+)?$/i.test(origin)) return null
+  if (!/^[a-z0-9]{1,16}$/i.test(fingerprint)) return null
+  return { origin, fingerprint }
+}
