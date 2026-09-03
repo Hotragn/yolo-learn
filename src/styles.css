@@ -1,32 +1,39 @@
-/* Yolo Learn - quiet light
+/* Yolo Learn - deep green on warm paper
  *
- * Light by default, near-neutral greys, and one restrained blue. The previous
- * palette put a neon lime on near-black, which reads hacker-terminal rather
- * than considered, and made the accent unusable as text: lime on white is
- * about 1.9:1, so every lime label needed a separate darkened token.
+ * Third palette, and this one has a reason rather than a preference behind it.
  *
- * Blue at #2757d6 clears 6.4:1 on white in both directions, so the same accent
- * can be a fill AND carry text. One token, no special cases. Dark mode is
- * still there behind the toggle; it is just no longer the thing a first-time
- * visitor meets.
+ * The product's entire vocabulary is health: a flow is healthy, or drifted, or
+ * healed. Those are the three states on every card and in every tool response.
+ * An accent that is literally the colour of health is doing semantic work, not
+ * decoration, and it means the primary accent and the "healthy" state are the
+ * same token instead of two colours competing.
+ *
+ * Deep forest #1B6B45 rather than a bright green: it clears 5.6:1 on the paper
+ * background and 6.2:1 in reverse, so one token is both a fill and text. The
+ * earlier lime failed that (1.9:1 on white) and needed a separate darkened
+ * token everywhere. The blue that replaced it was accessible but generic, and
+ * carried no meaning the product actually uses.
+ *
+ * Background is warm off-white rather than blue-grey, so the whole thing reads
+ * closer to paper than to a console.
  */
 
 :root {
   color-scheme: light;
 
-  --ink: #16161a;
-  --ink-soft: #5b5b63;
-  --ink-faint: #86868f;
+  --ink: #1a1a17;
+  --ink-soft: #5c5c54;
+  --ink-faint: #8a8a80;
   --surface: #ffffff;
-  --surface-2: #f6f6f7;
-  --page: #fafafa;
-  --border: #e6e6e8;
-  --border-strong: #d0d0d4;
+  --surface-2: #f7f6f2;
+  --page: #faf9f5;
+  --border: #e7e5dd;
+  --border-strong: #d2cfc3;
 
-  --accent: #2757d6;
-  --accent-ink: #1c47b8;
-  --accent-wash: #eef2fe;
-  --accent-edge: #c8d6f8;
+  --accent: #1b6b45;
+  --accent-ink: #145537;
+  --accent-wash: #eaf3ed;
+  --accent-edge: #bcd9c8;
   --on-accent: #ffffff;
 
   --warn: #8a5300;
@@ -44,9 +51,9 @@
   --shadow: 0 1px 2px rgba(22, 22, 26, 0.05), 0 10px 30px -22px rgba(22, 22, 26, 0.4);
   --mono-legacy: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Mono", Menlo, Consolas, monospace;
 
-  --logo-bg: #16161a;
-  --logo-ring: #fafafa;
-  --logo-mark: #6f9bff;
+  --logo-bg: #1a1a17;
+  --logo-ring: #faf9f5;
+  --logo-mark: #4ec38a;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -56,16 +63,16 @@
     --ink: #f7f8f8;
     --ink-soft: #9b9fa4;
     --ink-faint: #74787d;
-    --surface: #16181a;
-    --surface-2: #1c1f21;
-    --page: #08090a;
-    --border: #2b2e31;
-    --border-strong: #3d4146;
+    --surface: #191914;
+    --surface-2: #201f19;
+    --page: #0d0d0b;
+    --border: #2e2d25;
+    --border-strong: #434135;
 
-    --accent: #4d7df5;
-    --accent-ink: #9ab6ff;
-    --accent-wash: #141c31;
-    --accent-edge: #2a3d66;
+    --accent: #2f9d68;
+    --accent-ink: #6fd3a1;
+    --accent-wash: #0f2418;
+    --accent-edge: #1f4a33;
     --on-accent: #ffffff;
 
     --warn: #f0bf6b;
@@ -86,15 +93,15 @@
   --ink: #f7f8f8;
   --ink-soft: #9b9fa4;
   --ink-faint: #74787d;
-  --surface: #16181a;
-  --surface-2: #1c1f21;
-  --page: #08090a;
-  --border: #2b2e31;
-  --border-strong: #3d4146;
-  --accent: #4d7df5;
-  --accent-ink: #9ab6ff;
-  --accent-wash: #141c31;
-  --accent-edge: #2a3d66;
+  --surface: #191914;
+  --surface-2: #201f19;
+  --page: #0d0d0b;
+  --border: #2e2d25;
+  --border-strong: #434135;
+  --accent: #2f9d68;
+  --accent-ink: #6fd3a1;
+  --accent-wash: #0f2418;
+  --accent-edge: #1f4a33;
   --on-accent: #ffffff;
   --warn: #f0bf6b;
   --warn-wash: #2a2113;
@@ -132,7 +139,7 @@ a { color: var(--accent-ink); text-underline-offset: 2px; }
 
 code, kbd, .mono { font-family: var(--mono); font-size: 0.9em; overflow-wrap: anywhere; }
 
-.shell { max-width: 900px; margin: 0 auto; padding: 12px 18px 72px; }
+.shell { max-width: 1060px; margin: 0 auto; padding: 12px 22px 72px; }
 
 /* --- header ------------------------------------------------------------- */
 
@@ -1179,4 +1186,81 @@ main > h2:first-of-type {
   border-radius: var(--radius-sm);
   padding: 9px 12px;
   margin: 0 0 14px;
+}
+
+/* --- read any form ------------------------------------------------------ */
+.any-input {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.5;
+  resize: vertical;
+}
+.any-samples { margin: 16px 0 22px; }
+.any-samples .row { margin-top: 8px; }
+.any-result {
+  margin-top: 22px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  background: var(--surface);
+}
+.any-result.ok { border-color: var(--accent-edge); }
+.any-result.bad { border-color: var(--warn-edge); background: var(--warn-wash); }
+.any-msg {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 550;
+}
+.any-result.ok .any-msg { color: var(--accent-ink); }
+.any-result.bad .any-msg { color: var(--warn); }
+.any-msg svg { flex: none; margin-top: 2px; }
+.any-meta { display: flex; flex-wrap: wrap; gap: 26px; margin: 16px 0 0; }
+.any-meta dt {
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ink-faint);
+}
+.any-meta dd { margin: 3px 0 0; font-size: 14.5px; }
+.any-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+.any-table th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-weight: 500;
+  padding: 0 12px 7px 0;
+  border-bottom: 1px solid var(--border);
+}
+.any-table td { padding: 8px 12px 8px 0; border-bottom: 1px solid var(--border); vertical-align: top; }
+.any-table tr:last-child td { border-bottom: 0; }
+.any-refused {
+  margin-top: 16px;
+  background: var(--warn-wash);
+  border: 1px solid var(--warn-edge);
+  border-radius: var(--radius-sm);
+  padding: 11px 13px;
+}
+.any-refused p { display: flex; gap: 9px; align-items: flex-start; margin: 0; font-size: 14px; color: var(--warn); }
+.any-refused svg { flex: none; margin-top: 2px; }
+
+@media (max-width: 640px) {
+  .any-table { font-size: 13px; }
+  .any-meta { gap: 16px; }
+}
+
+/* Header has six destinations now, so give the nav the room and let the
+   secondary controls compress before the labels do. */
+header nav { flex-wrap: nowrap; }
+header nav a { white-space: nowrap; }
+.head-right { flex: none; }
+@media (max-width: 900px) {
+  header { flex-wrap: wrap; row-gap: 8px; }
+  header nav { order: 3; width: 100%; overflow-x: auto; }
 }

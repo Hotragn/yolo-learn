@@ -63,11 +63,11 @@ export function Logo({ size = 28, ...rest }: IconProps) {
       </g>
       <path
         d="M8.5 23.5c7 0 6-11 15-11"
-        stroke="var(--logo-mark, #6F9BFF)"
+        stroke="var(--logo-mark, #4EC38A)"
         strokeWidth="2.9"
         strokeLinecap="round"
       />
-      <circle cx="23.5" cy="12.5" r="2.4" fill="var(--logo-mark, #6F9BFF)" />
+      <circle cx="23.5" cy="12.5" r="2.4" fill="var(--logo-mark, #4EC38A)" />
     </svg>
   )
 }

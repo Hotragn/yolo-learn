@@ -63,6 +63,12 @@ const STOPS: TourStop[] = [
       "It reads the clinic's form and builds a tool from what it found. Nobody demonstrates anything, and it invents nothing: it stores the shape of the task, never your values.",
   },
   {
+    target: "[data-tour='nav-any']",
+    title: "The answer to the obvious doubt",
+    body:
+      "We wrote the clinic and we wrote its redesign, so of course it survives. Paste any real form's HTML here and the same reading code runs on that instead.",
+  },
+  {
     target: "[data-tour='guided']",
     title: "Or watch the whole thing",
     body:

@@ -30,6 +30,7 @@ import { TeachProvider } from "./TeachMode"
 import { AgentConsole } from "./AgentConsole"
 import { Modal } from "./Modal"
 import SiteApp from "./SiteApp"
+import { AnyForm } from "./AnyForm"
 import { hasSeenTour, markTourSeen, Tour } from "./Tour"
 import {
   IconAlert,
@@ -170,6 +171,9 @@ export default function App() {
             <a href="#/tools" aria-current={path === "/tools"} data-tour="nav-tools">
               Agent tools
             </a>
+            <a href="#/any" aria-current={path === "/any"} data-tour="nav-any">
+              Try your own
+            </a>
           </nav>
           <div className="head-right">
             <SiteVersionPill />
@@ -197,7 +201,9 @@ export default function App() {
           </p>
         )}
 
-        {path === "/site" ? (
+        {path === "/any" ? (
+          <AnyForm />
+        ) : path === "/site" ? (
           <SiteApp />
         ) : path === "/tools" ? (
           <ToolsView />
@@ -352,7 +358,9 @@ function Onboarding() {
         </div>
       </div>
       <p className="explain-note">
-        In short: press the button, watch it read the fake clinic, then switch the clinic to v2 and watch it survive.
+        In short: press the button, watch it read the fake clinic, then switch the clinic to v2 and watch it survive.{" "}
+        Suspicious that we broke our own site on purpose? <a href="#/any">Paste in a real form</a> and watch the same
+        code read that instead.
       </p>
 
 

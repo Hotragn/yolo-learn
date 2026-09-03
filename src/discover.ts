@@ -72,7 +72,7 @@ function wizardForm(): HTMLFormElement | null {
 }
 
 function headingFor(form: HTMLFormElement): string {
-  const scope = form.closest("section, div, main, article") ?? document.body
+  const scope = form.closest("section, div, main, article") ?? form.ownerDocument.body
   const heading = scope.querySelector("h1, h2, h3, h4, legend")
   return heading?.textContent?.trim() ?? ""
 }
@@ -104,6 +104,25 @@ function purposeOf(el: HTMLElement & { name?: string; id?: string }, label: stri
 
 const stripRequiredMark = (text: string) => text.replace(/\s*\*\s*$/, "").trim()
 
+/**
+ * The human-readable text of a <label>, without the control it wraps.
+ *
+ * A wrapping label's textContent includes everything inside it, so a
+ * <label>Year group <select><option>Year 3</option>...</select></label> reads
+ * as "Year group Choose Year 3Year 4Year 5". Our own clinic happens to put its
+ * text in a <span>, which is why this never showed up until the reader was
+ * pointed at markup that does not.
+ */
+function labelText(labelEl: Element): string {
+  const span = labelEl.querySelector("span")
+  if (span?.textContent?.trim()) return stripRequiredMark(span.textContent)
+  const clone = labelEl.cloneNode(true) as Element
+  for (const control of clone.querySelectorAll("input, select, textarea, option, optgroup, button, datalist")) {
+    control.remove()
+  }
+  return stripRequiredMark(clone.textContent ?? "")
+}
+
 function labelOf(el: HTMLElement): string {
   // element.labels is the DOM's own answer, and it covers both a wrapping
   // <label> and one associated by for/id. Hand-rolling that with a selector
@@ -111,13 +130,12 @@ function labelOf(el: HTMLElement): string {
   // markup that used an id.
   const labels = (el as HTMLInputElement).labels
   if (labels?.length) {
-    const span = labels[0].querySelector("span")
-    const text = stripRequiredMark(span?.textContent ?? labels[0].textContent ?? "")
+    const text = labelText(labels[0])
     if (text) return text
   }
   const wrapping = el.closest("label")
   if (wrapping) {
-    const text = stripRequiredMark(wrapping.querySelector("span")?.textContent ?? wrapping.textContent ?? "")
+    const text = labelText(wrapping)
     if (text) return text
   }
   return (
@@ -139,6 +157,15 @@ function labelOf(el: HTMLElement): string {
  */
 function isVisible(el: HTMLElement): boolean {
   if (el.hidden) return false
+  if (el instanceof HTMLInputElement && el.type === "hidden") return false
+
+  // Read display and visibility off the style ATTRIBUTE as well as the
+  // computed style. A parsed document has no defaultView to compute in, so
+  // relying on getComputedStyle alone let a display:none honeypot through as a
+  // real field. Found by a test against markup with one in it.
+  const inline = (el.getAttribute("style") ?? "").replace(/\s+/g, "").toLowerCase()
+  if (inline.includes("display:none") || inline.includes("visibility:hidden")) return false
+
   const style = el.ownerDocument.defaultView?.getComputedStyle(el)
   if (style && (style.display === "none" || style.visibility === "hidden")) return false
   const hasLayout = el.ownerDocument.body.getBoundingClientRect().height > 0
@@ -359,5 +386,135 @@ export async function discoverFlow(options: DiscoverOptions = {}): Promise<Disco
       notes,
       refused,
     },
+  }
+}
+
+
+// --- reading a form this app did not write ------------------------------
+//
+// The demo learns a clinic we authored, on a version-2 redesign we authored,
+// which is a fair thing for a skeptic to point at: of course it works, we
+// broke our own site. The field-reading in this file is the part actually
+// under question, so it is exposed here against arbitrary markup.
+//
+// Nothing about it is special-cased to our own DOM: isVisible already tolerates
+// a document with no layout, labelOf goes through element.labels, and purposes
+// come from name and autocomplete attributes that any real form carries.
+//
+// No wizard walking, because that needs the site's own JavaScript and we only
+// have its markup. One form, one step, read exactly as the live path reads it.
+
+export interface StaticReadResult {
+  ok: boolean
+  message: string
+  formCount: number
+  intent: string
+  toolName: string
+  submitLabel: string
+  fields: FieldSpec[]
+  /** Credential and payment fields, refused rather than read. */
+  refused: string[]
+  /** Where each purpose came from, so the reading can be checked by eye. */
+  provenance: { purpose: string; label: string; from: string; required: boolean; options?: string[] }[]
+}
+
+function provenanceOf(el: HTMLElement): string {
+  if (el.getAttribute("name")) return `name="${el.getAttribute("name")}"`
+  const ac = el.getAttribute("autocomplete")
+  if (ac && ac !== "off" && ac !== "on") return `autocomplete="${ac}"`
+  if ((el as HTMLInputElement).labels?.length) return "its <label>"
+  if (el.getAttribute("aria-label")) return "aria-label"
+  if (el.getAttribute("placeholder")) return "placeholder"
+  if (el.getAttribute("id")) return `id="${el.getAttribute("id")}"`
+  return "element order"
+}
+
+/** Read a form out of a string of HTML, using the live discovery path. */
+export function readFormFromHTML(html: string): StaticReadResult {
+  const empty: StaticReadResult = {
+    ok: false,
+    message: "",
+    formCount: 0,
+    intent: "",
+    toolName: "",
+    submitLabel: "",
+    fields: [],
+    refused: [],
+    provenance: [],
+  }
+
+  const trimmed = html.trim()
+  if (!trimmed) return { ...empty, message: "Paste some HTML first." }
+
+  let doc: Document
+  try {
+    doc = new DOMParser().parseFromString(trimmed, "text/html")
+  } catch {
+    return { ...empty, message: "That did not parse as HTML." }
+  }
+
+  const forms = [...doc.querySelectorAll<HTMLFormElement>("form")]
+  // A pasted fragment often omits the <form> wrapper, so fall back to the body
+  // and treat it as one.
+  let form = forms.find((f) => f.querySelector("input, select, textarea")) ?? forms[0] ?? null
+  if (!form && doc.body.querySelector("input, select, textarea")) {
+    form = doc.createElement("form")
+    while (doc.body.firstChild) form.appendChild(doc.body.firstChild)
+    doc.body.appendChild(form)
+  }
+  if (!form) {
+    return {
+      ...empty,
+      message:
+        "No form controls in there. Paste the markup around the fields: an <input>, <select> or <textarea> has to be present.",
+    }
+  }
+
+  const refused: string[] = []
+  const fields = readFields(form, refused)
+  if (!fields.length) {
+    return {
+      ...empty,
+      formCount: forms.length,
+      refused,
+      message: refused.length
+        ? `Every field in that form was a credential or payment field, so all ${refused.length} were refused and nothing was read.`
+        : "Found a form but no readable fields in it.",
+    }
+  }
+
+  const submitLabel = labelOfButton(
+    form.querySelector<HTMLButtonElement | HTMLInputElement>(
+      "button[type=submit], input[type=submit], button:not([type]), button[type=button]"
+    )
+  )
+  const intent = intentFrom(form, fields)
+
+  const provenance = [...form.querySelectorAll<HTMLElement>("input, select, textarea")]
+    .filter((el) => fields.some((f) => f.label === labelOf(el)))
+    .map((el) => {
+      const field = fields.find((f) => f.label === labelOf(el))!
+      return {
+        purpose: field.purpose,
+        label: field.label,
+        from: provenanceOf(el),
+        required: !!field.required,
+        options: field.options,
+      }
+    })
+
+  return {
+    ok: true,
+    message:
+      `Read ${fields.length} field(s) from markup this app has never seen` +
+      (refused.length ? `, and refused ${refused.length} credential or payment field(s)` : "") +
+      ".",
+    formCount: forms.length,
+    intent,
+    toolName: slugify(intent) || "pasted_task",
+    submitLabel: submitLabel || "(no submit button found)",
+    fields,
+    refused,
+    provenance,
   }
 }
