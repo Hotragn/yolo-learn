@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1260 742" width="1260" height="742" role="img" aria-label="Yolo Learn architecture: the read, remember, mint, run and heal pipeline">
+  <title>Yolo Learn architecture</title>
+  <desc>A layered pipeline. Any page's DOM is read by discover.ts, remembered as a semantic map with no values, minted as a WebMCP tool, called by an agent, and executed by the runner behind a human approval gate. When the site changes, drift.ts feeds corrections back into the stored map.</desc>
+
+  <defs>
+    <style>
+      .t { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+      .m { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+      .rail-label { font-size: 12px; font-weight: 700; letter-spacing: 1.4px; }
+      .blk-t { font-size: 13.5px; font-weight: 600; }
+      .blk-s { font-size: 11.5px; }
+    </style>
+    <marker id="a-lime" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 1L9 5L0 9z" fill="#7BD40A"/>
+    </marker>
+    <marker id="a-amber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 1L9 5L0 9z" fill="#E0A94A"/>
+    </marker>
+  </defs>
+
+  <rect width="1260" height="742" rx="16" fill="#08090A"/>
+
+  <!-- title -->
+  <text class="t" x="44" y="52" fill="#F7F8F8" font-size="26" font-weight="500" letter-spacing="-0.5">Yolo Learn architecture</text>
+  <text class="t" x="44" y="78" fill="#9B9FA4" font-size="14">Read a page, remember it by purpose, mint a tool, run it behind a human gate, heal it when the page changes.</text>
+
+  <!-- flow rail -->
+  <path d="M182 128 L182 636" stroke="#35521A" stroke-width="2" fill="none"/>
+  <path d="M182 128 L182 632" stroke="#7BD40A" stroke-width="2" fill="none" marker-end="url(#a-lime)" opacity="0.9"/>
+
+  <!-- ============ BAND 1: THE PAGE ============ -->
+  <rect x="36" y="104" width="1120" height="76" rx="10" fill="#111213" stroke="#232527"/>
+  <text class="t rail-label" x="56" y="138" fill="#9B9FA4">THE PAGE</text>
+  <text class="t" x="56" y="158" fill="#5F646A" font-size="11">any origin</text>
+
+  <rect x="210" y="116" width="306" height="52" rx="8" fill="#17191A" stroke="#2B2E31"/>
+  <text class="t blk-t" x="226" y="139" fill="#F7F8F8">Live DOM</text>
+  <text class="m blk-s" x="226" y="157" fill="#9B9FA4">name · label · required · option</text>
+
+  <rect x="530" y="116" width="306" height="52" rx="8" fill="#17191A" stroke="#2B2E31"/>
+  <text class="t blk-t" x="546" y="139" fill="#F7F8F8">Declarative WebMCP</text>
+  <text class="m blk-s" x="546" y="157" fill="#9B9FA4">toolname · tooldescription</text>
+
+  <rect x="850" y="116" width="306" height="52" rx="8" fill="#17191A" stroke="#2B2E31"/>
+  <text class="t blk-t" x="866" y="139" fill="#F7F8F8">Native validation</text>
+  <text class="m blk-s" x="866" y="157" fill="#9B9FA4">required blocks the walk</text>
+
+  <!-- ============ BAND 2: READ ============ -->
+  <rect x="36" y="194" width="1120" height="76" rx="10" fill="#0F1A0B" stroke="#35521A"/>
+  <text class="t rail-label" x="56" y="228" fill="#A8E85C">READ</text>
+  <text class="m" x="56" y="248" fill="#5F7A3A" font-size="11">discover.ts</text>
+
+  <rect x="210" y="206" width="226" height="52" rx="8" fill="#131C10" stroke="#3D5C1F"/>
+  <text class="t blk-t" x="226" y="229" fill="#F7F8F8">Purpose, not selector</text>
+  <text class="m blk-s" x="226" y="247" fill="#93A87A">from name attribute</text>
+
+  <rect x="450" y="206" width="226" height="52" rx="8" fill="#131C10" stroke="#3D5C1F"/>
+  <text class="t blk-t" x="466" y="229" fill="#F7F8F8">Walk the wizard</text>
+  <text class="m blk-s" x="466" y="247" fill="#93A87A">throwaway probes</text>
+
+  <rect x="690" y="206" width="226" height="52" rx="8" fill="#131C10" stroke="#3D5C1F"/>
+  <text class="t blk-t" x="706" y="229" fill="#F7F8F8">Only press "next"</text>
+  <text class="m blk-s" x="706" y="247" fill="#93A87A">never a real submit</text>
+
+  <rect x="930" y="206" width="226" height="52" rx="8" fill="#2A1B15" stroke="#5C3A24"/>
+  <text class="t blk-t" x="946" y="229" fill="#F2938C">Refuse credentials</text>
+  <text class="m blk-s" x="946" y="247" fill="#C08A82">password · cc-* · otp</text>
+
+  <!-- ============ BAND 3: REMEMBER ============ -->
+  <rect x="36" y="284" width="1120" height="76" rx="10" fill="#0F1A0B" stroke="#35521A"/>
+  <text class="t rail-label" x="56" y="318" fill="#A8E85C">REMEMBER</text>
+  <text class="m" x="56" y="338" fill="#5F7A3A" font-size="11">store.ts</text>
+
+  <rect x="210" y="296" width="466" height="52" rx="8" fill="#131C10" stroke="#3D5C1F"/>
+  <text class="t blk-t" x="226" y="319" fill="#F7F8F8">Semantic map</text>
+  <text class="m blk-s" x="226" y="337" fill="#93A87A">steps by intent · fields by purpose · never a CSS path</text>
+
+  <rect x="690" y="296" width="466" height="52" rx="8" fill="#131C10" stroke="#3D5C1F"/>
+  <text class="t blk-t" x="706" y="319" fill="#F7F8F8">No stored values</text>
+  <text class="m blk-s" x="706" y="337" fill="#93A87A">learned = every field a parameter · taught = your values kept</text>
+
+  <!-- ============ BAND 4: MINT ============ -->
+  <rect x="36" y="374" width="1120" height="76" rx="10" fill="#0F1A0B" stroke="#35521A"/>
+  <text class="t rail-label" x="56" y="408" fill="#A8E85C">MINT</text>
+  <text class="m" x="56" y="428" fill="#5F7A3A" font-size="11">learn.ts · webmcp.ts</text>
+
+  <rect x="210" y="386" width="466" height="52" rx="8" fill="#131C10" stroke="#3D5C1F"/>
+  <text class="m blk-t" x="226" y="409" fill="#F7F8F8">document.modelContext.registerTool()</text>
+  <text class="m blk-s" x="226" y="427" fill="#93A87A">mid-session · unique name · AbortController to remove</text>
+
+  <rect x="690" y="386" width="466" height="52" rx="8" fill="#131C10" stroke="#3D5C1F"/>
+  <text class="t blk-t" x="706" y="409" fill="#F7F8F8">JSON Schema from what it read</text>
+  <text class="m blk-s" x="706" y="427" fill="#93A87A">enum from options · required where no fallback exists</text>
+
+  <!-- ============ BAND 5: AGENT ============ -->
+  <rect x="36" y="464" width="1120" height="76" rx="10" fill="#111213" stroke="#232527"/>
+  <text class="t rail-label" x="56" y="498" fill="#9B9FA4">AGENT</text>
+  <text class="t" x="56" y="518" fill="#5F646A" font-size="11">calls the tool</text>
+
+  <rect x="210" y="476" width="306" height="52" rx="8" fill="#17191A" stroke="#2B2E31"/>
+  <text class="t blk-t" x="226" y="499" fill="#F7F8F8">Chrome 149 + flag</text>
+  <text class="m blk-s" x="226" y="517" fill="#7BD40A">verified: 7/7 registered</text>
+
+  <rect x="530" y="476" width="306" height="52" rx="8" fill="#17191A" stroke="#2B2E31"/>
+  <text class="t blk-t" x="546" y="499" fill="#F7F8F8">ChatGPT desktop</text>
+  <text class="m blk-s" x="546" y="517" fill="#9B9FA4">in-app browser</text>
+
+  <rect x="850" y="476" width="306" height="52" rx="8" fill="#17191A" stroke="#2B2E31"/>
+  <text class="t blk-t" x="866" y="499" fill="#F7F8F8">Simulated agent</text>
+  <text class="m blk-s" x="866" y="517" fill="#9B9FA4">same tool objects, no flag</text>
+
+  <!-- ============ BAND 6: RUN + GATE ============ -->
+  <rect x="36" y="554" width="1120" height="76" rx="10" fill="#0F1A0B" stroke="#35521A"/>
+  <text class="t rail-label" x="56" y="588" fill="#A8E85C">RUN</text>
+  <text class="m" x="56" y="608" fill="#5F7A3A" font-size="11">runner.ts</text>
+
+  <rect x="210" y="566" width="306" height="52" rx="8" fill="#131C10" stroke="#3D5C1F"/>
+  <text class="t blk-t" x="226" y="589" fill="#F7F8F8">Validate untrusted args</text>
+  <text class="m blk-s" x="226" y="607" fill="#93A87A">enum · real dates · length cap</text>
+
+  <rect x="530" y="566" width="306" height="52" rx="8" fill="#2A2113" stroke="#6B5426"/>
+  <text class="t blk-t" x="546" y="589" fill="#F0BF6B">HUMAN GATE</text>
+  <text class="m blk-s" x="546" y="607" fill="#C9A468">exact values shown · deny wins</text>
+
+  <rect x="850" y="566" width="306" height="52" rx="8" fill="#131C10" stroke="#3D5C1F"/>
+  <text class="t blk-t" x="866" y="589" fill="#F7F8F8">Submit</text>
+  <text class="m blk-s" x="866" y="607" fill="#93A87A">only after approval</text>
+
+  <!-- ============ HEAL feedback loop ============ -->
+  <path d="M1156 592 L1210 592 L1210 322 L1156 322"
+        stroke="#E0A94A" stroke-width="2" fill="none" marker-end="url(#a-amber)"/>
+  <rect x="960" y="654" width="196" height="52" rx="8" fill="#2A2113" stroke="#6B5426"/>
+  <text class="t blk-t" x="976" y="677" fill="#F0BF6B">HEAL</text>
+  <text class="m blk-s" x="976" y="695" fill="#C9A468">drift.ts</text>
+  <path d="M1058 654 L1058 630" stroke="#E0A94A" stroke-width="2" fill="none" marker-end="url(#a-amber)"/>
+
+  <text class="t" x="36" y="672" fill="#9B9FA4" font-size="13" font-weight="600">When the page changes</text>
+  <text class="t" x="36" y="692" fill="#5F646A" font-size="12">Renames, reorders, removals and reworded buttons re-read from the page.</text>
+  <text class="t" x="36" y="710" fill="#5F646A" font-size="12">A value nobody ever supplied becomes exactly one question.</text>
+</svg>
