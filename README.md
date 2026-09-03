@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://yolo-learn.vercel.app"><img src="https://img.shields.io/badge/live%20demo-yolo--learn.vercel.app-7BD40A?style=flat-square&labelColor=0B1220" alt="Live demo"></a>
-  <img src="https://img.shields.io/badge/tests-188%20passing-7BD40A?style=flat-square&labelColor=0B1220" alt="188 tests passing">
+  <img src="https://img.shields.io/badge/tests-194%20passing-7BD40A?style=flat-square&labelColor=0B1220" alt="194 tests passing">
   <img src="https://img.shields.io/badge/Chrome%20149-7%2F7%20tools%20registered-7BD40A?style=flat-square&labelColor=0B1220" alt="Verified on Chrome 149">
   <img src="https://img.shields.io/badge/dependencies-react%20only-0B1220?style=flat-square" alt="React only">
   <img src="https://img.shields.io/badge/license-MIT-0B1220?style=flat-square" alt="MIT license">
@@ -459,6 +459,47 @@ else's page either: a WebMCP tool belongs to the document that registers it, so
 reaching real sites needs a browser extension. Both limits are stated on the
 page itself.
 
+## Shared memory
+
+Audits are remembered per page shape, keyed on `origin + a fingerprint of the
+page's structure`. The second person to look at a page sees that someone
+already did, and what it usually trips on.
+
+<img src="docs/shot-audit.png" alt="Auditing a real URL, with the shared memory hint above the lens reports" width="100%">
+
+Verified end to end on production, with `localStorage` wiped between runs so
+the knowledge could only have come from the store:
+
+```
+first  audit -> "Nobody has audited this page shape before."
+       ... clear all local memory, reload ...
+second audit -> "This page shape has been audited 1 time before,
+                 most recently 03/09/2026. Commonly trips: yolo-tiny-text (1).
+                 A hint only: the lenses above re-ran from scratch."
+```
+
+It is a **hint**, labelled as one everywhere. The lenses always re-run locally
+and nothing from the store is ever shown as a finding.
+
+**The write endpoint takes untrusted input, so it stores almost nothing.** Rule
+ids are checked against an allow-list; anything unrecognised is dropped. No free
+text, no rule names, no selectors, no details, and nothing about the caller.
+Verified against a hostile write on production:
+
+```
+sent    ["wcag-1.4.3","wcag-4.1.2","<script>alert(1)</script>",
+         "wcag-1.4.3-but-evil","../../etc/passwd","",null,42,{"a":1}]
+stored  {"wcag-1.4.3":1,"wcag-4.1.2":1}
+counts  999999999 -> 5000,  -50 -> 0,  "abc" -> 0
+```
+
+The worst a bad actor achieves is a wrong number next to a rule that already
+exists.
+
+It also degrades completely. With no store configured the app works exactly as
+before, remembering audits in your browser, and says so rather than showing an
+empty box.
+
 ## Run it
 
 ```
@@ -481,7 +522,7 @@ npm run dev
 | `#/?demo=healed` | Seeded: healed and matching |
 
 ```
-npm test          # 188 unit tests
+npm test          # 194 unit tests
 npm run check:ssrf # 14 SSRF vectors through the real handler
 npm run typecheck
 npm run build

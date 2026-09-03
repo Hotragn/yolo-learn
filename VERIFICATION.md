@@ -3,7 +3,7 @@
 **Live:** https://yolo-learn.vercel.app
 **Repo:** https://github.com/Hotragn/yolo-learn (public, MIT)
 
-`npm test` (188 tests), `npm run typecheck`, `npm run build` - all green. Browser
+`npm test` (194 tests), `npm run typecheck`, `npm run build` - all green. Browser
 QA driven through a headless Chromium against the dev server, the local
 production build (`vite preview`), and the live Vercel deployment.
 
@@ -411,6 +411,34 @@ both the paste and URL features was uncovered. Three tests now pin the failure
 behaviour. The happy path cannot be asserted in jsdom, which does not render
 `srcdoc`, so it is verified in a real browser and the test says so rather than
 pretending otherwise.
+
+## 6d. Shared memory
+
+| Property | How it was verified |
+| --- | --- |
+| Reads and writes on production | `configured:true`, GET on a fresh key returns `record:null` |
+| Genuinely shared, not local | Second audit with `localStorage` fully wiped reported "audited 1 time before". That can only have come from the store |
+| Keyed on the audited page | Network trace shows `origin=https://www.w3.org&fingerprint=1iwtirm`, a fingerprint of W3C's DOM, not ours |
+| Hostile rule ids dropped | Sent a script tag, a near-miss id, a path traversal, empty, null, a number and an object. Stored: only the two real ids |
+| Counts clamped | `999999999` to 5000, `-50` to 0, `"abc"` to 0 |
+| Origin validation | Path, `javascript:`, `file:` and junk all rejected |
+| Rate limiting is shared | Writes tripped 429 below the nominal count because earlier requests in the same window counted, which a per-instance counter could not have done |
+| Degrades with no store | Endpoint reports `configured:false` with the reason, and the UI says so |
+
+### A bug this found
+
+The first end-to-end attempt showed no hint on the second audit. Cause: the
+caller recomputed the key with `auditKey(document, origin)`, fingerprinting Yolo
+Learn's own DOM instead of the audited page's. Every audited URL on one origin
+would have collided on one fingerprint, and the fingerprint would never change
+when the target page did. The audit already computed the right key internally
+and discarded it; it is now returned on the result. Six regression tests, the
+sharpest asserting that mutating our own document does not change an audited
+page's key.
+
+A second, smaller finding: the first browser harness set `input.value` directly,
+which React does not observe, so it silently audited the current page instead of
+the URL. Worth recording because the run *looked* like it passed.
 
 ## 7. Limitations - what is NOT verified
 
