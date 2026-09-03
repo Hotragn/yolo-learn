@@ -1,6 +1,8 @@
 import { safeGetItem, safeSetItem } from "./types"
-import { CrawlResult, readFlowAcrossPages, readPagesInOrder } from "./crawl"
+import { CrawlResult, readFlowAcrossPages, readPagesInOrder, toStep } from "./crawl"
+import { readFormFromHTML } from "./discover"
 import { toolNameForOrigin } from "./remembered"
+import { stripSensitiveMarkup } from "./sanitize"
 
 /**
  * Memory for real sites, so a page is read once rather than once per visit.
@@ -215,6 +217,65 @@ export async function learnUrl(
       (moved
         ? `The shape CHANGED since last time (${previous!.fingerprint} to ${fingerprint}), so the stored task moved.`
         : `Stored as ${fingerprint}. The next visit is a free cache hit.`),
+    toolName: toolNameForOrigin(origin),
+  }
+}
+
+/**
+ * Learn from HTML painted in the user's own browser (logged-in tab, OAuth done).
+ * Cookies never leave that tab. Password and card fields are stripped first.
+ */
+export async function learnFromHtml(pageUrl: string, html: string): Promise<LearnUrlResult> {
+  const origin = originOf(pageUrl)
+  if (!origin) {
+    return { ok: false, cached: false, origin: "", steps: [], notes: [], bytesRead: 0, summary: "That is not a URL." }
+  }
+  const cleaned = stripSensitiveMarkup(html)
+  const read = readFormFromHTML(cleaned)
+  if (!read.ok) {
+    return {
+      ok: false,
+      cached: false,
+      origin,
+      steps: [],
+      notes: ["Snapshot came from your browser. Cookies were not sent here."],
+      bytesRead: cleaned.length,
+      summary: `Could not read a task in that snapshot: ${read.message}`,
+    }
+  }
+  const steps = [
+    {
+      ...toStep(1, pageUrl, read),
+      advancedBy: "snapshot from your browser; the session stayed on your machine",
+    },
+  ]
+  const fingerprint = fingerprintOf(steps)
+  const previous = load()[origin]
+  const all = load()
+  all[origin] = {
+    origin,
+    startUrl: pageUrl,
+    fingerprint,
+    learnedAt: new Date().toISOString(),
+    steps,
+    bytesRead: cleaned.length,
+    visits: (previous?.visits ?? 0) + 1,
+  }
+  save(all)
+  await mintRememberedFor(origin)
+  return {
+    ok: true,
+    cached: false,
+    origin,
+    fingerprint,
+    steps,
+    notes: [
+      "Learned from a snapshot taken in your browser. Cookies and passwords were not sent to our server.",
+    ],
+    bytesRead: cleaned.length,
+    summary:
+      `Read a snapshot of ${origin}: ${steps[0].fields.length} field(s). ` +
+      `Stored as ${fingerprint}. An agent can call ${toolNameForOrigin(origin)} without fetching.`,
     toolName: toolNameForOrigin(origin),
   }
 }

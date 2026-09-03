@@ -1,5 +1,5 @@
-import { useState } from "react"
-import { learnUrl, LearnUrlResult, recallRemote } from "./remote"
+import { useEffect, useState } from "react"
+import { learnFromHtml, learnUrl, LearnUrlResult, recallRemote } from "./remote"
 import { EXAMPLE_PUBLIC_FORM } from "./page-fetch"
 import { logEvent } from "./store"
 import { IconAlert, IconCheck, IconCopy, IconRemember } from "./icons"
@@ -11,6 +11,23 @@ function looksLikeUrl(value: string): boolean {
   } catch {
     return false
   }
+}
+
+function captureBookmarklet(origin: string) {
+  const dest = JSON.stringify(origin)
+  const ingest = JSON.stringify(`${origin}/api/ingest`)
+  const fallback = JSON.stringify(`${origin}/#/any?capture=1`)
+  return (
+    "javascript:void((function(){var html=document.documentElement.outerHTML;var url=location.href;" +
+    `fetch(${ingest},{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({url:url,html:html})})` +
+    ".then(function(r){return r.json()}).then(function(d){if(d&&d.id){window.open(" +
+    dest +
+    "+'/#/any?snap='+d.id,'_blank')}else{throw new Error('no id')}}).catch(function(){var w=window.open(" +
+    fallback +
+    ",'_blank');var send=function(){try{w.postMessage({source:'yolo-capture',url:url,html:html}," +
+    dest +
+    ")}catch(e){}};setTimeout(send,600);setTimeout(send,1800);});})())"
+  )
 }
 
 /**
@@ -26,6 +43,54 @@ export function LearnUrlPanel({ compact = false }: { compact?: boolean }) {
   const [remote, setRemote] = useState<LearnUrlResult | null>(null)
 
   const [copied, setCopied] = useState(false)
+  const [copiedMark, setCopiedMark] = useState(false)
+  const [waitingCapture, setWaitingCapture] = useState(false)
+
+  useEffect(() => {
+    const onMsg = (e: MessageEvent) => {
+      const d = e.data as { source?: string; url?: string; html?: string }
+      if (d?.source !== "yolo-capture" || typeof d.url !== "string" || typeof d.html !== "string") return
+      setWaitingCapture(false)
+      setUrl(d.url)
+      setBusy(true)
+      void learnFromHtml(d.url, d.html).then((out) => {
+        setRemote(out)
+        logEvent("learn", out.summary)
+        setBusy(false)
+      })
+    }
+    window.addEventListener("message", onMsg)
+    return () => window.removeEventListener("message", onMsg)
+  }, [])
+
+  useEffect(() => {
+    const qs = new URLSearchParams(location.hash.split("?")[1] ?? "")
+    if (qs.get("capture") === "1") setWaitingCapture(true)
+    const snap = qs.get("snap")
+    if (!snap) return
+    let cancelled = false
+    setBusy(true)
+    void (async () => {
+      try {
+        const r = await fetch(`/api/ingest?id=${encodeURIComponent(snap)}`)
+        const d = (await r.json()) as { html?: string; url?: string; error?: string }
+        if (cancelled) return
+        if (d.html && d.url) {
+          setUrl(d.url)
+          const out = await learnFromHtml(d.url, d.html)
+          if (!cancelled) {
+            setRemote(out)
+            logEvent("learn", out.summary)
+          }
+        } else if (!cancelled) setError(d.error || "That snapshot expired. Capture the page again.")
+      } finally {
+        if (!cancelled) setBusy(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const run = async (force = false) => {
     const extra = trail
@@ -67,15 +132,13 @@ export function LearnUrlPanel({ compact = false }: { compact?: boolean }) {
             <IconRemember size={17} /> Read a public site, then skip the re-read
           </h2>
           <p className="sub">
-            Paste a URL. If the first GET has no fields, we run the page JavaScript in headless Chrome (read-only) and
-            learn what it drew. Login, OAuth, and POST are still refused. GitHub-style SPAs that never paint a form
-            will still come back empty.
+            Paste a URL for a public page. For a logged-in dashboard, capture the tab you already signed into: cookies
+            stay in that browser. We still refuse passwords and never POST.
           </p>
         </>
       ) : (
         <p className="sub">
-          Paste a public URL. If the HTML is an empty JavaScript shell, we render it once in headless Chrome, then
-          remember the fields. Next visit fetches nothing.
+          Public URL, or capture a logged-in tab with the bookmarklet. Next visit fetches nothing.
         </p>
       )}
 
@@ -119,6 +182,20 @@ export function LearnUrlPanel({ compact = false }: { compact?: boolean }) {
         >
           Use a known-good example (W3C survey)
         </button>
+        <button
+          type="button"
+          className="link trail-toggle"
+          onClick={() => {
+            void navigator.clipboard.writeText(captureBookmarklet(location.origin))
+            setCopiedMark(true)
+            setTimeout(() => setCopiedMark(false), 2000)
+          }}
+        >
+          {copiedMark ? "Copied capture bookmarklet" : "Copy bookmarklet (logged-in tab)"}
+        </button>
+        {waitingCapture && (
+          <p className="explain-note">Waiting for a snapshot from the tab you captured. Keep this window open.</p>
+        )}
         <button
           type="button"
           className="link trail-toggle"

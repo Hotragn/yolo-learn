@@ -1,38 +1,50 @@
+import { Buffer } from "node:buffer"
 import { defineConfig, type PreviewServer, type ViteDevServer } from "vite"
 import react from "@vitejs/plugin-react"
 import type { IncomingMessage, ServerResponse } from "node:http"
 
-// WebMCP is refused in documents that are not origin-keyed: registerTool and
-// getTools reject with SecurityError unless the agent cluster is origin-keyed.
-// Chrome does not origin-key by default, so the header is mandatory rather than
-// a hardening extra - locally and in production (see vercel.json).
 const webmcpHeaders = {
   "Origin-Agent-Cluster": "?1",
 }
 
-/**
- * Vercel serves /api/fetch-page.js in production. Vite's SPA fallback would
- * otherwise return index.html, and learn_url would fail parsing "<!doctype".
- */
-function mountFetchPage(server: ViteDevServer | PreviewServer) {
-  server.middlewares.use(async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
+function mountVercelApi(route: string, file: string) {
+  return async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
     const path = req.url?.split("?")[0]
-    if (path !== "/api/fetch-page") return next()
-    const { default: handler } = await import("./api/fetch-page.js")
+    if (path !== route) return next()
+    const { default: handler } = await import(file)
     const url = new URL(req.url ?? "", "http://local.dev")
+    let body: Record<string, unknown> = {}
+    if ((req.method ?? "GET").toUpperCase() === "POST") {
+      const chunks: Buffer[] = []
+      for await (const c of req) chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c))
+      try {
+        body = JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}") as Record<string, unknown>
+      } catch {
+        body = {}
+      }
+    }
     const fakeReq = {
+      method: req.method,
       query: Object.fromEntries(url.searchParams),
       headers: req.headers,
+      body,
     }
     const fakeRes = {
+      writableEnded: false,
       setHeader: (k: string, v: string) => res.setHeader(k, v),
       status(code: number) {
         res.statusCode = code
         return this
       },
-      json(body: unknown) {
+      json(payload: unknown) {
+        this.writableEnded = true
         res.setHeader("content-type", "application/json; charset=utf-8")
-        res.end(JSON.stringify(body))
+        res.end(JSON.stringify(payload))
+      },
+      end(payload?: string) {
+        this.writableEnded = true
+        if (payload) res.end(payload)
+        else res.end()
       },
     }
     try {
@@ -43,12 +55,17 @@ function mountFetchPage(server: ViteDevServer | PreviewServer) {
         res.setHeader("content-type", "application/json; charset=utf-8")
         res.end(
           JSON.stringify({
-            error: err instanceof Error ? err.message : "Could not fetch that page.",
+            error: err instanceof Error ? err.message : "API error.",
           })
         )
       }
     }
-  })
+  }
+}
+
+function mountApis(server: ViteDevServer | PreviewServer) {
+  server.middlewares.use(mountVercelApi("/api/fetch-page", "./api/fetch-page.js"))
+  server.middlewares.use(mountVercelApi("/api/ingest", "./api/ingest.js"))
 }
 
 export default defineConfig({
@@ -56,8 +73,8 @@ export default defineConfig({
     react(),
     {
       name: "yolo-learn-api-dev",
-      configureServer: mountFetchPage,
-      configurePreviewServer: mountFetchPage,
+      configureServer: mountApis,
+      configurePreviewServer: mountApis,
     },
   ],
   server: { headers: webmcpHeaders },

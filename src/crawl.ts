@@ -95,7 +95,7 @@ function findNext(doc: Document, base: string, origin: string): { url: string; w
   return null
 }
 
-function toStep(order: number, url: string, read: StaticReadResult): CrawlStep {
+export function toStep(order: number, url: string, read: StaticReadResult): CrawlStep {
   return {
     order,
     url,

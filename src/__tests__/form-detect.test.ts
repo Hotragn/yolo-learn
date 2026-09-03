@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { hasLearnableControls } from "../../api/_form-detect.js"
+import { hasLearnableControls } from "../form-detect"
 
 describe("when a GET is worth a JS render", () => {
   it("treats a hidden-only SPA shell as empty", () => {

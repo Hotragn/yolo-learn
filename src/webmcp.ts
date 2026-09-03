@@ -38,7 +38,7 @@ import { getFlow, loadFlows, logEvent, patchFlow } from "./store"
 import { detectDrift, effectiveStatus, healFlow, storedValue } from "./drift"
 import { loadRun, normalizeParams, runFlowInteractive } from "./runner"
 import { auditDocument, auditUrl } from "./audit/run"
-import { knownRemotes, learnUrl, recallRemote } from "./remote"
+import { knownRemotes, learnFromHtml, learnUrl, recallRemote } from "./remote"
 import { rememberedDescription, toolNameForOrigin } from "./remembered"
 import { beginTeaching } from "./TeachMode"
 import { announceMint } from "./minted"
@@ -752,6 +752,47 @@ export async function registerStaticTools(): Promise<void> {
         })),
         notes: out.notes,
         stoppedBecause: out.stoppedBecause,
+      }
+    },
+  })
+
+  await registerTool({
+    name: "learn_markup",
+    description:
+      "Learn a task from HTML the user (or you) already rendered in a real browser, including a logged-in page. " +
+      "Pass the page url and the painted markup. Cookies stay in that browser; password and card fields are stripped. " +
+      "Use this when learn_url cannot see fields because they exist only after login.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "The http(s) URL of the tab the markup came from" },
+        html: { type: "string", description: "document.documentElement.outerHTML from that tab" },
+      },
+      required: ["url", "html"],
+    },
+    annotations: { readOnlyHint: true, untrustedContentHint: true },
+    execute: async (args, { signal }) => {
+      const bad = aborted(signal)
+      if (bad) return bad
+      const url = coerceValue(args.url).trim()
+      const html = coerceValue(args.html)
+      if (!url || !html) return { error: "Pass url and html from the painted page." }
+      const out = await learnFromHtml(url, html)
+      if (out.ok) logEvent("learn", `Snapshot of ${out.origin}`)
+      return {
+        summary: out.summary,
+        origin: out.origin,
+        tool: out.toolName,
+        fingerprint: out.fingerprint,
+        bytesRead: out.bytesRead,
+        steps: out.steps.map((st) => ({
+          order: st.order,
+          url: st.url,
+          intent: st.intent,
+          fields: st.fields.map((f) => ({ purpose: f.purpose, label: f.label, required: f.required })),
+          refusedFields: st.refused,
+        })),
+        notes: out.notes,
       }
     },
   })

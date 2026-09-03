@@ -15,7 +15,7 @@
   <img src="https://img.shields.io/badge/WebMCP-registerTool-7BD40A?style=flat-square&labelColor=0B1220" alt="WebMCP">
   <img src="https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript">
   <img src="https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=0B1220" alt="React">
-  <img src="https://img.shields.io/badge/tests-224-passing-7BD40A?style=flat-square&labelColor=0B1220" alt="224 tests">
+  <img src="https://img.shields.io/badge/tests-226-passing-7BD40A?style=flat-square&labelColor=0B1220" alt="226 tests">
   <img src="https://img.shields.io/badge/license-MIT-0B1220?style=flat-square" alt="MIT">
 </p>
 
@@ -93,6 +93,7 @@ What that file actually handles: `document` then `navigator` feature-detect; `re
 | --- | --- |
 | `recall_page` / `recall_url` | Do I already know this? Call first. A hit is the time saving. |
 | `learn_site` / `learn_url` | First visit. `pages` = URLs the user already opened by hand. |
+| `learn_markup` | HTML from a tab the user already opened (including logged-in). Cookies stay there. |
 | `remembered_<host>` | Minted mid-session after a public URL is learned. Call it instead of fetching. `refresh=true` re-reads. |
 | `start_teaching` | Human fills the clinic; the app watches. |
 | `run_flow` / minted name | Drive the task. Human owns irreversible steps. |
@@ -112,7 +113,7 @@ No flag: the simulated agent at the bottom calls the **same** registered objects
 
 **Northside Family Clinic stays.** Booking plus a real v2 redesign (rename, reorder, new required field, new button) is the heal loop. Inventing a different demo would throw that away.
 
-**Your site:** home page or `#/any` — paste the URL. If the first GET has no fields, the fetch function runs the page JavaScript in headless Chrome (read-only) and learns what it drew. It still will not POST or log in.
+**Your site:** paste a public URL, or capture a tab you already signed into (bookmarklet / `learn_markup`). Headless Chrome can run public JS. Sessions stay in your browser. Nothing is POSTed.
 
 **Audit:** `#/audit` — W3C’s own before/after pages are the control.
 
