@@ -406,7 +406,7 @@ function Onboarding() {
               : "Open the clinic and press Learn automatically. It reads the four-step booking form by itself."
           }
           href="#/site"
-          cta="Open demo site"
+          cta="Open the clinic"
         />
         <ChecklistItem
           done={ran}
@@ -698,7 +698,7 @@ function Library() {
             <div className="row">
               <a className="cta" href="#/site">
                 <IconRead size={18} />
-                Learn the demo site
+                Learn the clinic
               </a>
               <a className="ghost-link" href="#/site?teach=1">
                 or demonstrate it yourself
@@ -1047,7 +1047,7 @@ function ToolsView() {
             <p className="sub">Learn a flow and a tool appears here instantly.</p>
             <div className="row">
               <a className="cta" href="#/site">
-                <IconRead size={18} /> Learn the demo site
+                <IconRead size={18} /> Learn the clinic
               </a>
             </div>
           </div>
