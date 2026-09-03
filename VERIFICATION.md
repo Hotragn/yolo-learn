@@ -2,9 +2,12 @@
 
 Against BUILD.md section 9. Written 2026-09-02.
 
+**Live:** https://yolo-learn.vercel.app
+**Repo:** https://github.com/Hotragn/yolo-learn (public, MIT)
+
 Commands: `npm test` (51 tests), `npm run typecheck`, `npm run build` — all green.
-Browser QA driven through a headless Chromium against both the dev server and
-the production build (`vite preview`).
+Browser QA driven through a headless Chromium against the dev server, the local
+production build (`vite preview`), and the live Vercel deployment.
 
 ---
 
@@ -36,9 +39,9 @@ the human owns the submit.
 
 ## 2. The demo loop (section 4)
 
-Passed three consecutive times: twice against the dev server, once against the
-production build. **17 seconds** end to end on the production build, against a
-90 second budget.
+Passed five consecutive times: twice against the dev server, once against the
+local production build (17s), and **twice against live production (18s and
+19s)** from cleared storage, against a 90 second budget.
 
 | Beat | Result |
 | --- | --- |
@@ -147,9 +150,12 @@ focus returns to the trigger on close. Required fields carry the native
   error text. **This is the one thing to check by hand before submitting.**
 - **The ChatGPT desktop in-app browser.** Same reason.
 - **Firefox itself.** The degradation path is verified, the browser is not.
-- **Vercel deployment.** Ready but not run: `vercel.json` is in place and the
-  production build is verified locally, including the `Origin-Agent-Cluster`
-  header. Creating the project needs a project name, and BUILD.md reserves
-  naming for the founder.
+- **Vercel deployment — done and verified.** `https://yolo-learn.vercel.app`
+  cold-loads with cleared storage, serves `Origin-Agent-Cluster: ?1`, reports
+  `originAgentCluster === true`, registers all 6 built-in tools, and shows no
+  console errors and no failed requests. Note that Vercel's Standard Deployment
+  Protection leaves this clean production alias public but 302s the
+  build-specific URLs (`yolo-learn-<hash>-...vercel.app`) to an SSO login —
+  share the clean URL, not a deployment URL.
 - **`LICENSE` still reads `Copyright (c) 2026 [Founder Name]`**, as BUILD.md
   specified. Worth filling in before submitting.
