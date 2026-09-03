@@ -1,27 +1,21 @@
-/* Yolo Learn - deep green on warm paper
+/* Yolo Learn - monochrome action, semantic colour
  *
- * Third palette, and this one has a reason rather than a preference behind it.
+ * Fourth palette, and the last one, because this time the rule came from
+ * measurement rather than taste.
  *
- * The product's entire vocabulary is health: a flow is healthy, or drifted, or
- * healed. Those are the three states on every card and in every tool response.
- * An accent that is literally the colour of health is doing semantic work, not
- * decoration, and it means the primary accent and the "healthy" state are the
- * same token instead of two colours competing.
+ * Measured on the two reference sites for this category:
+ *   vercel.com  primary button rgb(23,23,23) on white, weight 500, 16px, r8
+ *   linear.app  primary button rgb(229,229,230) on near-black, weight 510, r999
  *
- * Deep forest #1B6B45 rather than a bright green: it clears 5.6:1 on the paper
- * background and 6.2:1 in reverse, so one token is both a fill and text. The
- * earlier lime failed that (1.9:1 on white) and needed a separate darkened
- * token everywhere. The blue that replaced it was accessible but generic, and
- * carried no meaning the product actually uses.
+ * NEITHER puts a brand colour on its primary action. That is the whole
+ * insight. Lime, then blue, then green all failed for the same underlying
+ * reason: a coloured CTA is what a template does, and the eye reads it as
+ * decoration competing with the content.
  *
- * Background is warm off-white rather than blue-grey, so the whole thing reads
- * closer to paper than to a console.
- *
- * --ink-faint was #8a8a80 until this project's own theme lens measured it at
- * 3.31:1 on the paper and failed it against SC 1.4.3. It carries 11px labels,
- * which is small text, so 4.5:1 applies with no large-text relaxation. Darkened
- * to #6f6f66 (4.8:1) and the dark-mode counterpart lightened to #8e9289
- * (5.6:1). Asserted by test now, so it cannot drift back.
+ * So actions are monochrome, and colour is reserved for things that MEAN
+ * something: severity, and flow health. When the only colour on screen is a
+ * red "high" chip or an amber "drifted" badge, it is impossible to miss, which
+ * is exactly what colour is for.
  */
 
 :root {
@@ -36,10 +30,10 @@
   --border: #e7e5dd;
   --border-strong: #d2cfc3;
 
-  --accent: #1b6b45;
-  --accent-ink: #145537;
-  --accent-wash: #eaf3ed;
-  --accent-edge: #bcd9c8;
+  --accent: #16161a;
+  --accent-ink: #16161a;
+  --accent-wash: #f4f4f2;
+  --accent-edge: #e2e1dc;
   --on-accent: #ffffff;
 
   --warn: #8a5300;
@@ -59,7 +53,7 @@
 
   --logo-bg: #1a1a17;
   --logo-ring: #faf9f5;
-  --logo-mark: #4ec38a;
+  --logo-mark: #fafaf8;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -75,10 +69,10 @@
     --border: #2e2d25;
     --border-strong: #434135;
 
-    --accent: #2f9d68;
-    --accent-ink: #6fd3a1;
-    --accent-wash: #0f2418;
-    --accent-edge: #1f4a33;
+    --accent: #f2f2f0;
+    --accent-ink: #f2f2f0;
+    --accent-wash: #1b1b16;
+    --accent-edge: #33322a;
     --on-accent: #ffffff;
 
     --warn: #f0bf6b;
@@ -104,10 +98,10 @@
   --page: #0d0d0b;
   --border: #2e2d25;
   --border-strong: #434135;
-  --accent: #2f9d68;
-  --accent-ink: #6fd3a1;
-  --accent-wash: #0f2418;
-  --accent-edge: #1f4a33;
+  --accent: #f2f2f0;
+  --accent-ink: #f2f2f0;
+  --accent-wash: #1b1b16;
+  --accent-edge: #33322a;
   --on-accent: #ffffff;
   --warn: #f0bf6b;
   --warn-wash: #2a2113;
@@ -1429,3 +1423,86 @@ header nav a { white-space: nowrap; }
 .shared-mem.off { border-color: var(--border); background: var(--surface-2); color: var(--ink-soft); }
 .shared-mem p { display: flex; gap: 9px; align-items: flex-start; margin: 0; }
 .shared-mem svg { flex: none; margin-top: 2px; }
+
+/* --- actions -----------------------------------------------------------
+   Typography and geometry taken from the measured reference: weight 500 not
+   600, 15px not 13px, radius 8px, and real horizontal padding. A cramped bold
+   button is the single loudest amateur tell in a developer tool. */
+
+button,
+.cta,
+.console-toggle {
+  font-family: var(--sans);
+  font-weight: 500;
+  letter-spacing: -0.006em;
+}
+
+button,
+.cta {
+  font-size: 15px;
+  border-radius: 8px;
+  padding: 9px 16px;
+  transition: background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+}
+
+/* The primary action is near-black on light and near-white on dark. No brand
+   colour, exactly as both reference sites do it. */
+button.primary,
+.cta {
+  background: var(--ink);
+  border: 1px solid var(--ink);
+  color: var(--page);
+}
+button.primary:hover,
+.cta:hover {
+  background: #000;
+  border-color: #000;
+}
+:root[data-theme="dark"] button.primary:hover,
+:root[data-theme="dark"] .cta:hover {
+  background: #fff;
+  border-color: #fff;
+}
+
+/* Secondary: a plain surface with a hairline, per vercel's second button. */
+button {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  color: var(--ink);
+}
+button:hover {
+  border-color: var(--ink-faint);
+  background: var(--surface-2);
+}
+button.deny {
+  color: var(--bad);
+  border-color: var(--bad-edge);
+  background: var(--surface);
+}
+button.deny:hover {
+  background: var(--bad-wash);
+  border-color: var(--bad);
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* One visible focus treatment everywhere, rather than the browser default in
+   some places and nothing in others. */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Severity and health keep their colour, because there it carries meaning. */
+.badge.healthy { background: #e8f3ec; color: #17603c; }
+.badge.drifted { background: #fdf1dd; color: #8a5300; }
+.badge.never_run { background: var(--surface-2); color: var(--ink-soft); }
+:root[data-theme="dark"] .badge.healthy { background: #10251a; color: #6fd3a1; }
+:root[data-theme="dark"] .badge.drifted { background: #2a2113; color: #f0bf6b; }
+
+@media (prefers-reduced-motion: reduce) {
+  button, .cta { transition: none; }
+}
