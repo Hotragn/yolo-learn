@@ -124,3 +124,61 @@ describe("a page that never renders must not read as clean", () => {
     expect(out.totals.checked).toBeGreaterThan(0)
   })
 })
+
+
+describe("the audit key describes the page that was audited", () => {
+  // The bug this guards: the caller used to recompute the key with
+  // auditKey(document, origin), fingerprinting Yolo Learn's own DOM instead of
+  // the audited page's. Every audited URL on one origin would then collide on a
+  // single fingerprint, and the fingerprint would never change when the target
+  // page did, so shared memory would have been keyed on the wrong thing
+  // entirely. The key is now computed from the audited document and returned on
+  // the result rather than rederived by the caller.
+  //
+  // auditHTML itself cannot be exercised here: it renders into an iframe, and
+  // jsdom does not lay out srcdoc frames, so it correctly takes its
+  // RENDER FAILED path. The browser verifies that end. These test the
+  // fingerprinting the key is built from.
+  const parse = (html: string) => new DOMParser().parseFromString(html, "text/html")
+  const FORM_A = `<form><label>Name <input name="name"></label><button>Next</button></form>`
+  const FORM_B = `<form><label>PO <input name="po_ref"></label><label>SKU <input name="sku"></label><button>Order</button></form>`
+
+  it("differs for different markup under the same label", () => {
+    expect(auditKey(parse(FORM_A), "https://same.example.com")).not.toBe(
+      auditKey(parse(FORM_B), "https://same.example.com")
+    )
+  })
+
+  it("is stable for the same markup, so a second look finds the first", () => {
+    expect(auditKey(parse(FORM_A), "https://same.example.com")).toBe(
+      auditKey(parse(FORM_A), "https://same.example.com")
+    )
+  })
+
+  it("differs for the same markup under different labels", () => {
+    expect(auditKey(parse(FORM_A), "https://a.example.com")).not.toBe(
+      auditKey(parse(FORM_A), "https://b.example.com")
+    )
+  })
+
+  it("yields a key the memory endpoint accepts, origin intact", () => {
+    const parts = splitAuditKey(auditKey(parse(FORM_A), "https://ok.example.com"))
+    expect(parts).not.toBeNull()
+    expect(parts!.origin).toBe("https://ok.example.com")
+    expect(parts!.fingerprint).toMatch(/^[a-z0-9]{1,16}$/)
+  })
+
+  it("cannot be published when the label is not an origin", () => {
+    // The pasted path labels its audits "pasted", which must never reach the
+    // shared store dressed as a real site.
+    expect(splitAuditKey(auditKey(parse(FORM_A), "pasted"))).toBeNull()
+  })
+
+  it("publishes nothing for a page that never rendered", async () => {
+    // An unmeasured page must not contribute to shared memory. Its key is
+    // empty, and splitAuditKey refuses it.
+    const out = await auditHTML(FORM_A, { label: "https://render-fail.example.com", remember: false })
+    expect(out.notes.join(" ")).toContain("RENDER FAILED")
+    expect(splitAuditKey(out.key)).toBeNull()
+  })
+})
