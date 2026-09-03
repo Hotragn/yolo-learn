@@ -1,61 +1,115 @@
 # Verification report
 
-Against BUILD.md section 9. Written 2026-09-02.
-
 **Live:** https://yolo-learn.vercel.app
 **Repo:** https://github.com/Hotragn/yolo-learn (public, MIT)
 
-Commands: `npm test` (51 tests), `npm run typecheck`, `npm run build` — all green.
-Browser QA driven through a headless Chromium against the dev server, the local
+`npm test` (73 tests), `npm run typecheck`, `npm run build` — all green. Browser
+QA driven through a headless Chromium against the dev server, the local
 production build (`vite preview`), and the live Vercel deployment.
 
 ---
 
-## 1. WebMCP API surface (P0 task 1)
+## 1. Autonomous learning
+
+The headline capability: learn a task on a site with **no human
+demonstration**. [`src/discover.ts`](src/discover.ts) reads the live DOM and
+deliberately never imports the site model in `types.ts` — if it read our own
+fixture, "it can learn a page nobody described to it" would be a lie.
+
+What it reads, in priority order:
+
+| Signal | Used for | Why |
+| --- | --- | --- |
+| `name` attribute | field purpose | It is what the server reads, so a visual redesign does not rewrite it |
+| `autocomplete` token | field purpose, fallback | Standardised and semantic |
+| `element.labels` | human label | The DOM's own answer; covers wrapping and `for`/`id` |
+| `required`, `type`, `<option>` values | schema | Straight from the markup |
+| `toolname` / `tooldescription` | tool naming | The declarative WebMCP contract |
+| `Step N of M` heading | terminal-step detection | Proof there is more to come |
+
+**Verified on the live production build:**
+
+```
+learn_site → Learned "clinic_booking" by reading the page:
+             4 steps, 5 fields, no demonstration and no invented values.
+notes      → ["Stopped at step 4 of 4 without submitting."]
+```
+
+Learning **v2 directly** — a layout it has never seen — discovers the redesigned
+shape correctly, including the field that does not exist in v1:
+
+```
+steps  → pick date and time > choose service > enter patient details > confirm booking
+params → date, time, serviceType, patientName, phone, insuranceId
+```
+
+### The three rules that keep it honest
+
+1. **It will not press a button it does not understand.** It advances only
+   through a label matching `next|continue|proceed|forward|onward`, or where a
+   `Step N of M` counter proves there is more to come. Anything else is terminal
+   and never clicked — so discovery cannot trip a real submit. Verified: on both
+   site versions it stops at step 4 without pressing `Confirm booking` /
+   `Book appointment`, and a fixture whose button reads `Place order` is refused.
+2. **It invents nothing.** Discovery stores the shape of the task and zero
+   values. The throwaway probes it types to satisfy native validation are
+   reported separately, written to the audit trail, and discarded.
+3. **It cannot loop.** A page that stops advancing ends the walk with
+   `"the page stopped advancing"` rather than spinning to `maxSteps`.
+
+### Consequence for the drift engine
+
+An autonomously learned flow has every field as a parameter and no values, so
+the question rule had to change: **a declared parameter is never a question.**
+It belongs in the tool's `inputSchema`, marked `required` when there is no
+stored fallback, so the agent is told up front instead of finding out by
+failing. That makes the two learning paths differ in exactly the right way:
+
+| | Learned autonomously | Taught by demonstration |
+| --- | --- | --- |
+| Stored values | none | every field the user filled |
+| `inputSchema.required` | every parameter | none — omitting one reuses the demo value |
+| Verified call with `{}` | names the missing parameter | replays `checkup / 2026-09-11 / 10:00 AM / Jane Doe / 555-0142` |
+| Questions after v2 redesign | 1 (insurance ID) | 1 (insurance ID) |
+
+## 2. WebMCP API surface
 
 Verified against the [spec](https://webmachinelearning.github.io/webmcp/) and
-[Chrome's docs](https://developer.chrome.com/docs/ai/webmcp). Three of
-BUILD.md's assumptions were wrong, and one requirement was missing entirely.
+[Chrome's docs](https://developer.chrome.com/docs/ai/webmcp). Three of BUILD.md's
+assumptions were wrong, and one requirement was missing entirely.
 
 | Assumption in BUILD.md | What the spec says | Consequence |
 | --- | --- | --- |
-| `registerTool(tool)` is sync and idempotent | Returns a `Promise` and **rejects with `InvalidStateError`** if the name exists | Two flows with the same name would have silently pointed one tool at the wrong flow. Names are now uniquified (`book_appointment_2`) and failures are reported. |
-| Re-registering is harmless | Same as above | Re-mint after heal was dropped; delete/undo unregisters and re-registers explicitly. |
-| Tools are removed by unregistering | No `unregisterTool` in the spec: **abort the `AbortSignal`** passed to `registerTool` | Delete now aborts the per-tool `AbortController`, with a best-effort `unregisterTool` fallback for builds that expose one. |
-| *(not mentioned)* | **WebMCP is refused in documents that are not origin-keyed.** `Origin-Agent-Cluster: ?0` disables it; Chrome does not origin-key by default | **The deployed demo could not have registered anything.** The app now serves `Origin-Agent-Cluster: ?1` (`vite.config.ts`, `vercel.json`), and the banner reports it if the header goes missing. |
+| `registerTool(tool)` is sync and idempotent | Returns a `Promise` and **rejects with `InvalidStateError`** if the name exists | Two flows with the same name would have silently pointed one tool at the wrong flow. Names are uniquified (`clinic_booking_2`) and failures reported. |
+| Re-registering is harmless | Same as above | Delete/undo unregisters and re-registers explicitly. |
+| Tools are removed by unregistering | No `unregisterTool` in the spec: **abort the `AbortSignal`** passed to `registerTool` | Delete aborts the per-tool `AbortController`, with a best-effort `unregisterTool` fallback. |
+| *(not mentioned)* | **WebMCP is refused in documents that are not origin-keyed** | **The deployed demo could not have registered anything.** The app serves `Origin-Agent-Cluster: ?1` (`vite.config.ts`, `vercel.json`), and the banner reports it if the header goes missing. |
 
-Confirmed correct as written in BUILD.md: `document.modelContext` is the entry
-point (the earlier proposal used `navigator.modelContext`, so both are
-feature-detected), `execute` is `Promise<any> (inputObject, {signal})`, and the
-declarative attribute names `toolname` / `tooldescription` /
-`toolparamdescription`.
+Confirmed correct as written: `document.modelContext` is the entry point (the
+earlier proposal used `navigator.modelContext`, so both are feature-detected),
+`execute` is `Promise<any> (inputObject, {signal})`, and the declarative
+attribute names. Added from the spec: `readOnlyHint` / `untrustedContentHint`,
+the `toolchange` event (so the Tools view listens instead of polling on a
+timer), and `name` attributes on form controls — without which the declarative
+tool's schema has no usable property keys. `toolautosubmit` is deliberately not
+used: the human owns the submit.
 
-Added from the spec: `annotations.readOnlyHint` and
-`annotations.untrustedContentHint`, set honestly per tool; the `toolchange`
-event, so the Tools view listens instead of polling on a 1s timer; `name`
-attributes on the form controls, without which the declarative tool's schema
-has no usable property keys. `toolautosubmit` is deliberately **not** used —
-the human owns the submit.
+## 3. The demo loop
 
-## 2. The demo loop (section 4)
+Both loops passed repeatedly, most recently **twice consecutively against the
+live production deployment** from cleared storage.
 
-Passed five consecutive times: twice against the dev server, once against the
-local production build (17s), and **twice against live production (18s and
-19s)** from cleared storage, against a 90 second budget.
+| Loop | Time | Result |
+| --- | --- | --- |
+| Autonomous (learn → run → v2 → heal → run) | **16s** | green |
+| Taught (demonstrate → mint → run → v2 → heal → run) | **18–19s** | green |
 
-| Beat | Result |
-| --- | --- |
-| 1. Teach by hand, mark 2 fields changeable | 5 fields captured in step order with their demonstrated values |
-| 2. Tool appears in `#/tools`, same session, no reload | Green flash naming `book_appointment`, auto-navigation, card highlighted, `new this session` badge, schema `{date, patientName}` |
-| 3. Agent runs with new details, human approves | Dialog listed all 6 values before submit; approved → `Booking confirmed, reference NSC-2583` |
-| 4. Switch to `#/site?v=2` | Redesign banner, wizard rebuilt in the new step order |
-| 5. Health check | **Exactly 4 changes, exactly 1 question** — see below |
-| 6. Answer, heal, run again | `healed and matches site v2.0`, then `Booking confirmed, reference NSC-3811` |
+Budget was 90 seconds.
 
-Beat 5 verbatim from `check_flow_health`:
+Beat 5 verbatim from `check_flow_health`, unchanged by either path:
 
 ```
-4 changes since this flow was taught, 3 heal automatically, 1 needs an answer from you.
+4 changes since this flow was learned, 3 heal automatically, 1 needs an answer from you.
   RENAMED    "Your name" is now labeled "Full name (as on insurance card)"      auto
   NEW_FIELD  New field "Insurance ID" appeared in "enter patient details"       ASKS YOU
   WORDING    Button "Confirm booking" is now "Book appointment"                 auto
@@ -66,96 +120,114 @@ Beat 5 verbatim from `check_flow_health`:
 
 One change per line of the site's own changelog, asserted by test.
 
-## 3. Edge cases (section 6)
+## 4. Edge cases
 
 | Case | Result |
 | --- | --- |
-| Teach with zero fields marked changeable | Mints with 0 parameters, warns that every run books the same appointment, replays the demo exactly. Verified running it. |
-| Run with missing params | Falls back to demonstrated values per field. Verified the dialog showed all 5 demo values. |
-| Heal with an empty answer | Stays `drifted`, question re-asked. The UI gates the Heal button (`Answer to heal`, disabled) until answered. |
-| Delete a flow mid-run | Run completes, the flow is **not** resurrected in storage, no console errors. (The original `{...getFlow(id)!}` would have thrown a `TypeError` here.) |
-| Teach two flows with the same name | Auto-renamed `book_appointment_2`; both tools registered; no `InvalidStateError` |
-| Reload during an agent run | Wizard resets clean, tools and flows re-registered, no errors. Verified with the approval dialog open at reload time. |
-| Cold load with empty localStorage | Empty state renders, 6 built-in tools register, no errors. Also verified against corrupt and partial storage by unit test. |
-| Firefox graceful degradation | **Verified by code path, not in Firefox.** The whole QA pass ran in a Chromium with no `document.modelContext`, which is the identical degradation path: amber banner naming the flag, every page functional, nothing thrown. |
-| Chrome with the WebMCP flag | **Not verified — see limitations.** |
-| ChatGPT desktop in-app browser | **Not verified — see limitations.** |
+| Learn the same site twice | Auto-renamed `clinic_booking_2`; both tools registered; no `InvalidStateError` |
+| Learn on v2 directly | 6 fields discovered in v2's order, including `insurance id` |
+| Learn from a page with no form | Reported, not thrown (unit-tested); the tool navigates to the site first |
+| Discovery on a stalling page | Ends with "the page stopped advancing" instead of looping |
+| Auto-learned flow called with a missing required parameter | Names the parameter to pass; does **not** falsely claim drift |
+| Teach with zero fields marked changeable | Mints with 0 parameters, warns honestly, replays the demo |
+| Run with missing params (taught flow) | Falls back to demonstrated values per field |
+| Heal with an empty answer | Stays `drifted`, question re-asked; the Heal button stays gated |
+| Delete a flow mid-run | Run completes, flow not resurrected, no console errors |
+| Two flows with the same name | Auto-renamed; both registered |
+| Reload during an agent run | Wizard resets clean, tools and flows re-registered, no errors |
+| Navigate away mid-approval | Settles as a denial rather than hanging the agent's promise |
+| Abort mid-run | Cancels between steps and during every animation pause |
+| Cold load with empty localStorage | Empty state, 7 built-in tools register, no errors |
+| Corrupt / partial localStorage | Bad entries dropped rather than crashing the UI (unit-tested) |
+| Theme choice | Persists across reload; `system` follows `prefers-color-scheme` |
+| Onboarding checklist | Ticks itself to 3/3 from real flow state |
+| Reset demo data | Clears flows, unregisters tools, empties the audit trail |
+| Firefox graceful degradation | **Verified by code path, not in Firefox.** All QA ran in a Chromium with no `document.modelContext` — the identical degradation path: amber banner naming the flag, every page functional, nothing thrown. |
+| Chrome with the WebMCP flag | **Not verified — see limitations** |
+| ChatGPT desktop in-app browser | **Not verified — see limitations** |
 
-Additional cases found and fixed during QA, beyond the section 6 list:
+### Bugs the browser pass found that unit tests could not
 
-- **A date-shaped string that is not a date.** `2026-13-99` and `2026-02-30`
-  passed the regex, then submitted blank because a date input holds nothing it
-  cannot parse. Dates now round-trip before they are accepted.
-- **Navigating away mid-approval hung the agent's promise forever.** Unmount now
-  settles it as a denial. A hung tool call is worse than a denied one.
-- **Aborting mid-run** cancels between steps and during every animation pause,
-  and resolves an open approval dialog as a denial.
-- **Tool registration order** was non-deterministic under React's
-  double-invoked mount effect; `initTools()` serializes it.
+- **`?teach=1` only worked on a fresh mount.** Following "or demonstrate it
+  yourself" while already on the site page changed the hash without remounting,
+  so teach mode silently never started. The check now listens for `hashchange`.
+- **`CSS.escape` is not guaranteed to exist**, and discovery crashed on any input
+  with an `id` but no wrapping label. Replaced with `element.labels`, which is
+  the correct DOM API for both association styles.
+- **`offsetParent` is null wherever there is no layout engine**, which would make
+  discovery skip every field. Visibility now uses computed style and only trusts
+  the layout signal when the document demonstrably has layout.
+- **An auto-learned tool described itself as "taught by the user by demonstrating
+  it once"**, and claimed omitted parameters would reuse a demonstrated value.
+  Neither was true. The description now branches on provenance.
+- **A date-shaped string that is not a date** (`2026-13-99`, `2026-02-30`) passed
+  validation and submitted blank. Dates now round-trip before being accepted.
+- **Long identifiers overflowed their card** (`document.modelContext.registerTool`).
+- **React's double-invoked mount effect** let tool registration interleave;
+  `initTools()` serializes it.
 
-## 4. Keyboard and accessibility
+## 5. Accessibility and theme
 
-Dialogs are `role="dialog" aria-modal="true"` with `aria-labelledby`; focus
-moves to the primary action on open (verified: `Approve and submit`), Tab wraps
-inside the dialog (verified both directions), Escape takes the safe path
-(verified: denies the submit, `You denied the submit. Nothing was sent.`), and
-focus returns to the trigger on close. Required fields carry the native
-`required` attribute, so teach mode cannot capture a blank required field.
-`prefers-reduced-motion` disables the animations.
+Dialogs are `role="dialog" aria-modal="true"` with `aria-labelledby`; focus moves
+to the primary action on open (verified: `Approve and submit`), Tab wraps inside
+the dialog in both directions, <kbd>Esc</kbd> always takes the safe path
+(verified: denies the submit), and focus returns to the trigger on close.
+Required fields carry the native `required` attribute, so teach mode cannot
+capture a blank required field. `prefers-reduced-motion` disables animation.
 
-## 5. Deviations from BUILD.md, with reasons
+The Slate + Signal Lime theme uses lime as a **fill, never as text on a light
+surface**: `#7BD40A` on white is about 1.9:1, so buttons put near-black ink *on*
+lime (about 11:1) and lime-coloured text uses a darkened `--accent-ink` (about
+7.7:1). On dark surfaces the raw lime is safe. Dark mode follows
+`prefers-color-scheme` with a manual override that persists.
 
-1. **Drift counts one reorder as one change**, not one per moved step. As
-   written, a single swap produced 5 changes for a 4-line changelog and beat 5
-   could not report "4 changes".
-2. **Questions come from missing values, not missing fields.** As written,
-   healing with an empty answer marked a flow `healthy` that could never run,
-   with no question left to answer. Now the question survives until a real
-   value exists.
-3. **Site version is remembered, not parsed from `location.hash` on every
-   read.** The Flow Library lives at `#/` with no `?v=` param, so as written it
-   always measured drift against v1 — the drifted badge could never appear
-   there — and a run started from `#/` silently downgraded to the old site.
-4. **`never_run` is preserved** rather than being overwritten with `healthy`.
-   Claiming health for something never executed is the fake confidence this app
-   exists to replace.
-5. **Parameters bind by field purpose only**, not by `(stepIntent, purpose)`, so
-   a field that is renamed *and* relocated stays bound to its parameter.
-6. **Tool arguments are normalized and rejected at the boundary**: select values
-   are case-normalized to the canonical option, dates must be real dates, values
-   are length-capped, and unknown keys are reported back as ignored. BUILD.md
-   asked for untrusted-input handling without specifying the mechanism.
-7. **`check_flow_health` / `run_flow` / `heal_flow` accept `flowName` as well as
-   `flowId`**, and `check_flow_health` with no arguments checks every flow. An
-   agent holds the tool name, not our internal id; this removes a round trip.
-8. **Added a simulated agent console.** It calls the same registered tool
-   objects with the same validation, the same `AbortSignal` and the same
-   approval step. Without it, none of the claims in this document are
-   demonstrable in a browser that lacks the flag — including for a judge. It
-   defaults to collapsed when a real agent is present.
-9. **Added files** beyond the section 8 tree: `src/Modal.tsx` (shared accessible
-   dialog), `src/AgentConsole.tsx`, `src/__tests__/*` (51 tests),
-   `vitest.config.ts`, `vercel.json`, this file.
-10. **`getRegisteredTools()` is kept** for compatibility but the UI uses
-    `getToolEntries()`, which carries the native/mirror state, the session-mint
-    flag and any registration error.
+## 6. Deviations from BUILD.md, with reasons
 
-## 6. Limitations — what is NOT verified
+1. **Autonomous learning was added.** BUILD.md's loop starts with a human
+   demonstration. Requiring a person to demonstrate a four-field booking form is
+   the weakest part of the pitch, so `learn_site` reads the page instead.
+   Teaching is kept for when the user wants their own values replayed.
+2. **A declared parameter is never a question.** Required for (1) to work, and
+   correct regardless: the input schema is the right place to say it.
+3. **Parameters are `required` in the schema only when there is no fallback.**
+   Self-documenting, and it tells the agent before it fails.
+4. **One reorder counts as one change**, not one per moved step. As written, a
+   single swap produced 5 changes for a 4-line changelog.
+5. **Questions come from missing values, not missing fields.** As written,
+   healing with an empty answer marked a flow healthy that could never run.
+6. **Site version is remembered, not parsed from `location.hash` on every read.**
+   The library lives at a route with no `?v=`, so as written it always measured
+   drift against v1 and a run started there silently downgraded the site.
+7. **`never_run` is preserved** rather than overwritten with `healthy`.
+8. **Parameters bind by field purpose only**, so a field that is renamed *and*
+   relocated stays bound.
+9. **Tool arguments are normalized at the boundary**: options case-normalized to
+   the canonical value, real-date checking, length caps, unknown keys reported
+   back as ignored.
+10. **`flowName` is accepted alongside `flowId`**, and `check_flow_health` with no
+    arguments checks every flow. An agent holds the name, not our internal id.
+11. **A simulated agent console was added.** It calls the same registered tool
+    objects with the same validation, `AbortSignal` and approval step. Without
+    it, none of these claims are demonstrable in a browser lacking the flag.
+12. **Routes changed**: `#/` is now a get-started page and the flow library moved
+    to `#/flows`. BUILD.md put the library at `#/`, but a submission with no
+    front door explains itself to nobody.
+13. **Added files** beyond the section 8 tree: `discover.ts`, `learn.ts`,
+    `minted.ts`, `icons.tsx`, `Modal.tsx`, `AgentConsole.tsx`, `__tests__/*`,
+    `vitest.config.ts`, `vercel.json`, and this file.
+
+## 7. Limitations — what is NOT verified
 
 - **Chrome 149+ with `chrome://flags/#enable-webmcp-testing`.** No such build is
   available in this environment, so no tool has been registered with a real
   `document.modelContext`. The integration is written against the spec IDL and
   reports failures honestly rather than swallowing them: if `registerTool`
-  rejects, the tool still works through the mirror and the card shows the
-  error text. **This is the one thing to check by hand before submitting.**
+  rejects, the tool still works through the mirror and the card shows the error.
+  **This is the one thing to check by hand before submitting.**
 - **The ChatGPT desktop in-app browser.** Same reason.
-- **Firefox itself.** The degradation path is verified, the browser is not.
-- **Vercel deployment — done and verified.** `https://yolo-learn.vercel.app`
-  cold-loads with cleared storage, serves `Origin-Agent-Cluster: ?1`, reports
-  `originAgentCluster === true`, registers all 6 built-in tools, and shows no
-  console errors and no failed requests. Note that Vercel's Standard Deployment
-  Protection leaves this clean production alias public but 302s the
-  build-specific URLs (`yolo-learn-<hash>-...vercel.app`) to an SSO login —
-  share the clean URL, not a deployment URL.
-- **`LICENSE` still reads `Copyright (c) 2026 [Founder Name]`**, as BUILD.md
-  specified. Worth filling in before submitting.
+- **Firefox itself.** The degradation path is verified; the browser is not.
+- **Discovery against arbitrary real-world sites.** It is unit-tested against
+  fixtures with markup the demo site does not use (labels by `for`/`id`,
+  `autocomplete` with no `name`, no headings, hidden and disabled controls,
+  stalling pages) and verified live on both versions of the demo clinic. It has
+  not been pointed at a third-party site.
