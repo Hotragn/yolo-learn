@@ -314,6 +314,50 @@ preference. No model, no opinions dressed as measurements.
 
 Self-audit after the palette fix reports **0 high-severity contrast failures**.
 
+## 6e. Auditing a live URL
+
+A serverless function fetches the page; the browser measures it in the
+sandboxed iframe. No headless browser anywhere in the stack.
+
+**Cross-verified against W3C's own matched pair.** The Before and After
+Demonstration is the same page built badly and built properly, which makes it
+an external control this project had no hand in:
+
+| Page | Findings | High | Medium | Low |
+| --- | --- | --- | --- | --- |
+| `bad/before/home.html` | 44 | 8 | 33 | 3 |
+| `bad/after/home.html` | 3 | 0 | 0 | 3 |
+
+The three remaining on the fixed page are house-rule preferences, not
+standards. Bug scout went 42 to 0 across the pair.
+
+**SSRF.** `npm run check:ssrf` drives fourteen vectors through the real
+handler: loopback by hostname and by literal, the cloud metadata endpoint,
+10/8, 172.16/12, 192.168/16, CGNAT, 0/8, IPv6 loopback and unique-local, the
+file and gopher schemes, malformed and empty input. **14 blocked, 0 allowed.**
+Verified again against production:
+
+```
+/api/fetch-page?url=http://169.254.169.254/latest/meta-data/
+  -> "169.254.169.254 resolves to 169.254.169.254, which is a private or
+      reserved address. Only public pages are fetched."
+/api/fetch-page?url=http://localhost/
+  -> "localhost resolves to 127.0.0.1, which is a private or reserved address."
+```
+
+DNS resolution is checked rather than the hostname string, which is what
+catches the `localhost` case, and every redirect hop is re-checked.
+
+**Deviation from BUILD.md.** "No backend" was a non-negotiable in the original
+brief. Auditing an arbitrary URL cannot be done from a static origin at all, so
+the founder chose to add one endpoint. It fetches and inlines; it analyses
+nothing. The three lenses, the WebMCP registration and all persistence remain
+in the browser.
+
+**Not verified:** behaviour against pages requiring authentication, and against
+sites that render their content client-side. The second is a known limitation
+rather than an untested one, and is reported in the result.
+
 ## 7. Limitations - what is NOT verified
 
 - **The ChatGPT desktop in-app browser.** Not tested. Native registration is

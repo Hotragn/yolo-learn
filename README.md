@@ -320,6 +320,59 @@ the behaviour is specified above but not yet coded.
 
 ---
 
+## Point it at a real URL
+
+No extension, nothing to install. Paste a URL on
+**[Audit](https://yolo-learn.vercel.app/#/audit)**.
+
+<img src="docs/shot-url-audit.png" alt="Auditing a live W3C page by URL, findings grouped by lens" width="100%">
+
+A serverless function does the one thing a static page genuinely cannot, which
+is read another origin, and hands back markup. The measuring stays in your
+browser, in a sandboxed iframe with scripts disabled, so layout and the cascade
+are the browser's own rather than a headless simulation. No Chrome running on a
+server anywhere.
+
+### It agrees with W3C about W3C's own pages
+
+The W3C publishes a matched pair for its Before and After Demonstration: the
+same page, once built badly and once built properly. Auditing both:
+
+| | Findings | High | Medium | Low |
+| --- | --- | --- | --- | --- |
+| [before](https://www.w3.org/WAI/demos/bad/before/home.html) (deliberately inaccessible) | **44** | 8 | 33 | 3 |
+| [after](https://www.w3.org/WAI/demos/bad/after/home.html) (the accessible version) | **3** | **0** | **0** | 3 |
+
+44 down to 3, high from 8 to 0, medium from 33 to 0. The three that remain on
+the fixed page are all house-rule preferences, not standards. That is external
+validation: the lenses reproduce W3C's own verdict on pages nobody here wrote.
+
+### Server-side fetch is an SSRF sink, so that is where the work went
+
+A URL is attacker-controlled input. Scheme allow-list, DNS **resolution**
+checked against every private, loopback, link-local, CGNAT and reserved range,
+and redirects followed one hop at a time with the same check on each
+destination. Resolving rather than pattern-matching is the whole point:
+`localhost` resolves into loopback and plenty of real hostnames resolve into
+private space, which a string blocklist waves straight through.
+
+```
+npm run check:ssrf     # 14 vectors through the real handler, including
+                       # the cloud metadata endpoint. 14 blocked, 0 allowed.
+```
+
+### What it cannot do, stated up front
+
+- **No JavaScript from the target runs.** A client-rendered site will look
+  nearly empty, and the result says so when the fetched page carries almost no
+  static text. Lighthouse runs a real headless Chrome and does see that content;
+  this does not.
+- **Public pages only.** Private and reserved addresses are refused, so it
+  cannot audit anything behind a login or on your network.
+- Only the first ten stylesheets are fetched, under a size budget.
+
+Agents get it as `audit_url`.
+
 ## Three lenses, not one agent guessing
 
 **[Audit](https://yolo-learn.vercel.app/#/audit)** runs three specialist passes
@@ -421,7 +474,7 @@ npm run dev
 | `#/site?v=2` | The same clinic, one year later |
 | `#/site?teach=1` | Teach mode, when you want your own values remembered |
 | `#/tools` | The live WebMCP registry |
-| `#/audit` | Three lenses over one page |
+| `#/audit` | Audit any URL, or this page, with three lenses |
 | `#/any` | Read a form this app did not write |
 | `#/?demo=learned` | Seeded: just read off the page |
 | `#/?demo=drifted` | Seeded: drift ready to read |
@@ -429,6 +482,7 @@ npm run dev
 
 ```
 npm test          # 175 unit tests
+npm run check:ssrf # 14 SSRF vectors through the real handler
 npm run typecheck
 npm run build
 ```
