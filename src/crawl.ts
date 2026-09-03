@@ -1,0 +1,202 @@
+import { readFormFromHTML, StaticReadResult } from "./discover"
+
+/**
+ * Read a task that spans several pages, on a site nobody here wrote.
+ *
+ * This is the honest version of "point it at a real checkout". It READS and
+ * never acts:
+ *
+ *   - GET only. It never POSTs, never submits a form, never fills a field on
+ *     anyone's site. A checkout is somebody's order pipeline, and the correct
+ *     number of orders for a demo to create is zero.
+ *   - Same origin only, so it cannot wander off the flow it was pointed at.
+ *   - Depth capped and visited-set deduped, so a page that links to itself
+ *     ends the walk instead of spinning.
+ *
+ * What it produces is the SHAPE of a multi-page task: which steps exist, what
+ * each one asks for, and where each field's purpose came from. That is the
+ * thing the drift engine stores, so this is the same reading the clinic gets,
+ * pointed at reality.
+ */
+
+export interface CrawlStep {
+  order: number
+  url: string
+  intent: string
+  submitLabel: string
+  formCount: number
+  fields: { label: string; purpose: string; from: string; required: boolean }[]
+  refused: string[]
+  /** Why the walk continued from here, or why it stopped. */
+  advancedBy?: string
+}
+
+export interface CrawlResult {
+  ok: boolean
+  startUrl: string
+  origin: string
+  steps: CrawlStep[]
+  notes: string[]
+  stoppedBecause: string
+}
+
+const NEXT_TEXT = /^\s*(next|continue|proceed|checkout|check\s*out|start|begin|get\s+started|sign\s*up|register|apply)\b/i
+const MAX_STEPS = 6
+const MAX_HTML = 400_000
+
+interface FetchedPage {
+  html?: string
+  finalUrl?: string
+  error?: string
+}
+
+async function fetchPage(url: string): Promise<FetchedPage> {
+  try {
+    const response = await fetch(`/api/fetch-page?url=${encodeURIComponent(url)}`)
+    return (await response.json()) as FetchedPage
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+function parse(html: string): Document {
+  return new DOMParser().parseFromString(html.slice(0, MAX_HTML), "text/html")
+}
+
+function sameOrigin(candidate: string, origin: string): boolean {
+  try {
+    return new URL(candidate).origin === origin
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Where does this page continue to?
+ *
+ * A GET form's action is the strongest signal, because that is literally the
+ * page saying "submitting me takes you here" without any state change. A link
+ * whose text reads like a next step is the fallback. A POST form is never
+ * followed: that is the boundary between reading a flow and driving one.
+ */
+function findNext(doc: Document, base: string, origin: string): { url: string; why: string } | null {
+  for (const form of [...doc.querySelectorAll("form")]) {
+    const method = (form.getAttribute("method") ?? "get").toLowerCase()
+    const action = form.getAttribute("action")
+    if (method !== "get" || !action) continue
+    try {
+      const url = new URL(action, base).toString()
+      if (sameOrigin(url, origin)) return { url, why: `the GET form's action (${action})` }
+    } catch {
+      /* unparseable action */
+    }
+  }
+
+  for (const link of [...doc.querySelectorAll("a[href]")]) {
+    const text = link.textContent ?? ""
+    if (!NEXT_TEXT.test(text)) continue
+    try {
+      const url = new URL(link.getAttribute("href")!, base).toString()
+      if (sameOrigin(url, origin) && !url.includes("#")) {
+        return { url, why: `a link reading "${text.trim().slice(0, 30)}"` }
+      }
+    } catch {
+      /* unparseable href */
+    }
+  }
+  return null
+}
+
+function toStep(order: number, url: string, read: StaticReadResult): CrawlStep {
+  return {
+    order,
+    url,
+    intent: read.intent || "unnamed step",
+    submitLabel: read.submitLabel,
+    formCount: read.formCount,
+    // provenance carries where each purpose was read from, which is the part
+    // worth showing: it is what makes the reading checkable by eye.
+    fields: read.provenance.map((f) => ({
+      label: f.label,
+      purpose: f.purpose,
+      from: f.from,
+      required: !!f.required,
+    })),
+    refused: read.refused ?? [],
+  }
+}
+
+export async function readFlowAcrossPages(
+  startUrl: string,
+  opts: { maxSteps?: number; onProgress?: (note: string) => void } = {}
+): Promise<CrawlResult> {
+  const maxSteps = Math.min(opts.maxSteps ?? MAX_STEPS, MAX_STEPS)
+  const progress = opts.onProgress ?? (() => {})
+  const notes: string[] = []
+  const steps: CrawlStep[] = []
+  const seen = new Set<string>()
+
+  let origin: string
+  try {
+    origin = new URL(startUrl).origin
+  } catch {
+    return { ok: false, startUrl, origin: "", steps, notes, stoppedBecause: "That is not a URL." }
+  }
+
+  let url = startUrl
+  let stoppedBecause = `Reached the ${maxSteps}-page cap.`
+
+  for (let i = 0; i < maxSteps; i++) {
+    if (seen.has(url)) {
+      stoppedBecause = "The flow looped back to a page already read."
+      break
+    }
+    seen.add(url)
+
+    progress(`reading page ${i + 1}: ${url.replace(origin, "")}`)
+    const page = await fetchPage(url)
+    if (page.error || !page.html) {
+      stoppedBecause = page.error ?? "That page returned nothing."
+      break
+    }
+
+    const landed = page.finalUrl ?? url
+    if (!sameOrigin(landed, origin)) {
+      stoppedBecause = `The flow left ${origin}, so the walk stopped rather than following it off-site.`
+      break
+    }
+
+    const read = readFormFromHTML(page.html)
+    if (read.ok) {
+      steps.push(toStep(steps.length + 1, landed, read))
+    } else if (steps.length === 0) {
+      stoppedBecause = read.message || "No form on the first page."
+      break
+    } else {
+      notes.push(`Page ${i + 1} had no readable form, so it is not counted as a step.`)
+    }
+
+    const next = findNext(parse(page.html), landed, origin)
+    if (!next) {
+      stoppedBecause =
+        "No GET form action and no next-looking link, so there was nowhere to continue that did not require submitting something."
+      break
+    }
+    if (steps.length) steps[steps.length - 1].advancedBy = next.why
+    url = next.url
+  }
+
+  notes.push("Read-only: GET requests only, nothing submitted and no field filled on the target site.")
+  if (steps.some((s) => s.refused.length)) {
+    notes.push("Credential and payment fields were refused, not read.")
+  }
+
+  return {
+    ok: steps.length > 0,
+    startUrl,
+    origin,
+    steps,
+    notes,
+    stoppedBecause,
+  }
+}
