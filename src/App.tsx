@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { Analytics } from "@vercel/analytics/react"
 import { getActiveSiteModel, safeGetItem, safeSetItem, syncSiteVersion, TaughtFlow } from "./types"
 import {
   clearAll,
@@ -237,6 +238,7 @@ export default function App() {
           </span>
         </footer>
       </div>
+      <Analytics />
     </TeachProvider>
   )
 }
