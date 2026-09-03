@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://yolo-learn.vercel.app"><img src="https://img.shields.io/badge/live%20demo-yolo--learn.vercel.app-7BD40A?style=flat-square&labelColor=0B1220" alt="Live demo"></a>
-  <img src="https://img.shields.io/badge/tests-200%20passing-7BD40A?style=flat-square&labelColor=0B1220" alt="200 tests passing">
+  <img src="https://img.shields.io/badge/tests-209%20passing-7BD40A?style=flat-square&labelColor=0B1220" alt="209 tests passing">
   <img src="https://img.shields.io/badge/Chrome%20149-7%2F7%20tools%20registered-7BD40A?style=flat-square&labelColor=0B1220" alt="Verified on Chrome 149">
   <img src="https://img.shields.io/badge/dependencies-react%20only-0B1220?style=flat-square" alt="React only">
   <img src="https://img.shields.io/badge/license-MIT-0B1220?style=flat-square" alt="MIT license">
@@ -25,6 +25,19 @@
 </p>
 
 ---
+
+## Not a WebMCP demo, and not a WebMCP replacement
+
+WebMCP gives a page exactly one thing: `registerTool()`, a way to hand tools to
+an agent. It has no opinion about where those tools come from, and no answer at
+all for what happens when the site changes underneath them. Hand-written WebMCP
+tools break on a redesign exactly the way Selenium scripts do.
+
+What is here is the layer above that: **reading a task off a page, remembering
+it by meaning rather than by selector, and repairing it when the page moves.**
+Of roughly 4,900 lines, about 80 touch the WebMCP API. It is the socket, not
+the product. Strip WebMCP out and the memory and repair engine still works;
+strip the drift engine out and what is left is a form filler.
 
 ## Sixty seconds
 
@@ -500,6 +513,52 @@ It also degrades completely. With no store configured the app works exactly as
 before, remembering audits in your browser, and says so rather than showing an
 empty box.
 
+## Pointed at real multi-page sites
+
+`read_flow` walks a task across pages on a site nobody here wrote, and reports
+each step's fields and where every purpose was read from. **Strictly read-only
+by design, not by disclaimer:** GET only, it follows a GET form's action or a
+next-looking link and *never* a POST, it stays on the origin it started on, and
+it fills nothing. The correct number of orders for a demo to create on
+somebody's real checkout is zero.
+
+On `zero.webappsecurity.com`, a published test target:
+
+```
+step 1  /login.html   "log in to zerobank"        submit: "Sign in"
+        user login        <- name="user_login"
+        user remember me  <- name="user_remember_me"
+        REFUSED: Password
+```
+
+Two things there matter. The purposes came from real `name` attributes on a page
+we did not write, and the password field was **refused on a live site**, not
+merely refused in a test.
+
+### What this proves, and what it does not
+
+It read one page and stopped, with this reason:
+
+> No GET form action and no next-looking link, so there was nowhere to continue
+> that did not require submitting something.
+
+That is the real finding, and it is worth more than a flattering demo would be:
+**you cannot read a real checkout without driving it.** Steps two onward only
+come into existence *after* something is submitted. Every real flow tested
+advances by POST, which this refuses to follow.
+
+The limit is structural, not a missing feature:
+
+| Barrier | Consequence |
+| --- | --- |
+| Real flows advance by POST | Read-only walking gets one page |
+| Modern checkouts render client-side | No JavaScript from the target runs, so the page looks empty |
+| Many commerce sites refuse non-browser requests | `demo.opencart.com` and others answer 403 |
+
+Getting past those means *driving* someone's site, which needs a browser
+extension and a user who has consented on that origin. That is a different
+product with a different safety story, and deliberately not this one.
+
 ## Run it
 
 ```
@@ -522,7 +581,7 @@ npm run dev
 | `#/?demo=healed` | Seeded: healed and matching |
 
 ```
-npm test          # 200 unit tests
+npm test          # 209 unit tests
 npm run check:ssrf # 14 SSRF vectors through the real handler
 npm run typecheck
 npm run build
