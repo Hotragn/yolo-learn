@@ -297,8 +297,9 @@ export async function registerStaticTools(): Promise<void> {
   await registerTool({
     name: "list_flows",
     description:
-      "List the flows this user has taught, with their health status and the parameters each one accepts. " +
-      "Call this first: each taught flow also exists as its own tool, named after the flow.",
+      "List every known flow across all sites, with health status and the parameters each accepts. Each flow " +
+      "also exists as its own tool, named after the flow. For \"do I know THIS page\", call recall_page instead: " +
+      "it is scoped to the current origin and tells you whether what is stored still matches.",
     inputSchema: { type: "object", properties: {} },
     annotations: { readOnlyHint: true, untrustedContentHint: true },
     execute: async (_args, { signal }) => {
@@ -479,6 +480,24 @@ export async function registerStaticTools(): Promise<void> {
           fields: s.fields.map((f) => ({ label: f.label, required: !!f.required, options: f.options })),
         })),
       }
+    },
+  })
+
+  await registerTool({
+    name: "recall_page",
+    description:
+      "Ask whether this page is already known. Call this FIRST on any page, before learn_site. Returns one of " +
+      "three states: miss (nothing known here, go and learn it), hit (already known and the page still matches " +
+      "what was stored, so run it immediately with nothing to re-read and nothing to ask), or stale (known but " +
+      "the page changed, so heal it first). This is a cache lookup keyed by origin and a fingerprint of the " +
+      "page's structure, so a hit is free.",
+    inputSchema: { type: "object", properties: {} },
+    annotations: { readOnlyHint: true, untrustedContentHint: true },
+    execute: async (_args, { signal }) => {
+      const bad = aborted(signal)
+      if (bad) return bad
+      const { recallForPage } = await import("./recall")
+      return recallForPage()
     },
   })
 

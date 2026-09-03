@@ -156,6 +156,14 @@ export interface TaughtFlow {
   learnedBy?: LearnedBy
   taughtAt: string
   siteVersionAtTeach: string
+  /** Cache key part one: which site this was learned on. */
+  origin?: string
+  /**
+   * Cache key part two: a digest of the page structure at learn time. This is
+   * the ETag. If the page still hashes to this, nothing has changed and there
+   * is nothing to recompute.
+   */
+  structureFingerprint?: string
   params: FlowParam[]
   steps: StepSpec[]
   fieldValues: Record<string, string>

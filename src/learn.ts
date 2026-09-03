@@ -1,6 +1,7 @@
 import { camel, siteHash, TaughtFlow, uniqueName } from "./types"
 import { flowNames, logEvent, upsertFlow } from "./store"
 import { discoverFlow } from "./discover"
+import { fingerprintSteps } from "./drift"
 import { isSiteMounted, resetSite } from "./runner"
 import { mintFlowTool } from "./webmcp"
 import { announceMint } from "./minted"
@@ -72,6 +73,8 @@ export async function learnCurrentSite(
     // what was actually on screen.
     siteVersionAtTeach:
       document.querySelector("[data-site-version]")?.getAttribute("data-site-version") ?? "unknown",
+    origin: location.origin,
+    structureFingerprint: fingerprintSteps(discovered.steps),
     // Everything it found becomes a parameter. Nothing is invented.
     params: fields.map(({ step, field }) => ({
       key: camel(field.purpose),

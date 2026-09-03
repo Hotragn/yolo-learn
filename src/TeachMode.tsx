@@ -1,6 +1,7 @@
 import { ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useState } from "react"
 import { camel, getActiveSiteModel, siteHash, TaughtFlow, uniqueName } from "./types"
 import { flowNames, logEvent, upsertFlow } from "./store"
+import { fingerprintSteps } from "./drift"
 import { mintFlowTool } from "./webmcp"
 import { announceMint } from "./minted"
 
@@ -88,6 +89,8 @@ export function TeachProvider({ children }: { children: ReactNode }) {
       learnedBy: "demonstration",
       taughtAt: new Date().toISOString(),
       siteVersionAtTeach: site.version,
+      origin: location.origin,
+      structureFingerprint: fingerprintSteps(site.steps),
       params: captured
         .filter((c) => c.isParam)
         .map((c) => ({

@@ -167,6 +167,39 @@ export function detectDrift(flow: TaughtFlow, current: SiteModel): DriftReport {
 }
 
 /**
+ * A digest of a page's structure: step order, intents, button labels, and each
+ * field's purpose, type, requiredness and option list.
+ *
+ * This is the ETag in the cache. Two pages that hash the same are the same
+ * task as far as this app is concerned, so a match means there is nothing to
+ * diff and nothing to heal. Deliberately does NOT include labels: a rename is
+ * drift the engine heals from the page, not a different task.
+ */
+export function fingerprintSteps(steps: StepSpec[]): string {
+  const canonical = steps
+    .map((step) =>
+      [
+        step.order,
+        step.intent,
+        step.submitLabel,
+        step.fields
+          .map((f) => `${f.purpose}:${f.type}:${f.required ? 1 : 0}:${(f.options ?? []).join("|")}`)
+          .join(";"),
+      ].join("~")
+    )
+    .join("//")
+
+  // FNV-1a. Deterministic, dependency-free, and this is a cache key rather
+  // than a security boundary, so a 32-bit non-cryptographic hash is right.
+  let hash = 0x811c9dc5
+  for (let i = 0; i < canonical.length; i++) {
+    hash ^= canonical.charCodeAt(i)
+    hash = Math.imul(hash, 0x01000193)
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0")
+}
+
+/**
  * A flow that has never run is "never run", not "healthy" - claiming health
  * for something untested would be exactly the kind of fake confidence this
  * app exists to replace.
@@ -190,6 +223,9 @@ function summarize(changes: DriftChange[], questions: DriftQuestion[]): string {
   )
   return parts.join(", ") + "."
 }
+
+/** Alias so recall.ts can name the report's parts without importing types.ts. */
+export type DriftReportOf = DriftReport
 
 export interface HealResult {
   flow: TaughtFlow
@@ -220,6 +256,9 @@ export function healFlow(flow: TaughtFlow, current: SiteModel, answers: Record<s
     ...flow,
     steps: current.steps.map((s) => ({ ...s, fields: s.fields.map((f) => ({ ...f })) })),
     fieldAnswers,
+    // Healing re-reads the page, so the cached fingerprint has to move with it.
+    // Leaving the old one would keep the flow permanently stale.
+    structureFingerprint: fingerprintSteps(current.steps),
     lastHealedAt: new Date().toISOString(),
     status: "healthy",
   }

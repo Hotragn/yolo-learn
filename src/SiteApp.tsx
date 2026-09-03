@@ -3,10 +3,11 @@ import { fieldName, FieldSpec, getActiveSiteModel, siteHash, slugify } from "./t
 import { valueForField } from "./drift"
 import { setRunExecutor, setSiteReset, RunResult } from "./runner"
 import { learnCurrentSite } from "./learn"
-import { logEvent } from "./store"
+import { logEvent, subscribe } from "./store"
+import { recallForPage } from "./recall"
 import { beginTeaching, useTeach } from "./TeachMode"
 import { Modal } from "./Modal"
-import { IconAlert, IconAuto, IconCheck, IconRecord, IconTerminal, IconTrash } from "./icons"
+import { IconAlert, IconCheck, IconRead, IconRecord, IconTerminal, IconTrash } from "./icons"
 
 interface PlanItem {
   stepIndex: number
@@ -361,24 +362,7 @@ export default function SiteApp() {
       )}
 
       {!teach.active && !running && (
-        <div className="learn-offer">
-          <div>
-            <b>Learn this page by itself</b>
-            <span>
-              No demonstration. It reads the form, walks the steps with throwaway values, and mints a tool from what
-              it finds. It will not press a button unless that button says "next".
-            </span>
-          </div>
-          <div className="row">
-            <button className="primary" onClick={() => void learnThisPage()} disabled={learning}>
-              <IconAuto size={17} />
-              {learning ? "Reading the page..." : "Learn automatically"}
-            </button>
-            <a className="ghost-link" href={siteHash("teach=1")}>
-              or demonstrate it yourself
-            </a>
-          </div>
-        </div>
+        <RecallPanel learning={learning} onLearn={() => void learnThisPage()} />
       )}
 
       <div
@@ -502,6 +486,99 @@ export default function SiteApp() {
           </div>
         </Modal>
       )}
+    </div>
+  )
+}
+
+/**
+ * What this app already knows about the page in front of it.
+ *
+ * Three states, one action each. Before this existed the panel always offered
+ * to learn, so visiting the site twice minted a duplicate flow.
+ */
+function RecallPanel({ learning, onLearn }: { learning: boolean; onLearn: () => void }) {
+  const [recall, setRecall] = useState(recallForPage)
+  useEffect(() => {
+    const refresh = () => setRecall(recallForPage())
+    refresh()
+    const offStore = subscribe(refresh)
+    window.addEventListener("hashchange", refresh)
+    return () => {
+      offStore()
+      window.removeEventListener("hashchange", refresh)
+    }
+  }, [])
+
+  const stale = recall.flows.filter((f) => f.state === "stale")
+  const questions = stale.flatMap((f) => f.questions ?? [])
+
+  if (recall.state === "miss") {
+    return (
+      <div className="recall miss">
+        <div className="recall-head">
+          <IconRead size={17} />
+          <b>Nothing known about this page yet</b>
+          <span className="fp">cache miss</span>
+        </div>
+        <span>
+          It can read the form, walk the steps with throwaway values, and mint a tool from what it finds. No
+          demonstration. It will not press a button unless that button says "next".
+        </span>
+        <div className="row">
+          <button className="primary" onClick={onLearn} disabled={learning}>
+            <IconRead size={17} />
+            {learning ? "Reading the page..." : "Learn automatically"}
+          </button>
+          <a className="ghost-link" href={siteHash("teach=1")}>
+            or demonstrate it yourself
+          </a>
+        </div>
+      </div>
+    )
+  }
+
+  if (recall.state === "hit") {
+    return (
+      <div className="recall hit">
+        <div className="recall-head">
+          <IconCheck size={17} />
+          <b>Already known: {recall.flows.map((f) => f.name).join(", ")}</b>
+          <span className="fp">cache hit · {recall.fingerprint}</span>
+        </div>
+        <span>
+          The page still hashes to what was stored, so there is nothing to re-read and nothing to ask. Run it from
+          your flows, or ask an agent to.
+        </span>
+        <div className="row">
+          <a className="cta" href="#/flows">
+            Go to flows
+          </a>
+          <a className="ghost-link" href={siteHash("teach=1")}>
+            teach another flow here
+          </a>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="recall stale">
+      <div className="recall-head">
+        <IconAlert size={17} />
+        <b>Known, but this page changed</b>
+        <span className="fp">cache stale · {recall.fingerprint}</span>
+      </div>
+      <span>
+        {stale.map((f) => f.name).join(", ")} no longer matches.{" "}
+        {stale.flatMap((f) => f.changes ?? []).length} change(s) detected,{" "}
+        {questions.length === 0 ? "none need an answer" : `${questions.length} needs an answer`}. Everything else
+        re-reads from the page.
+      </span>
+      <div className="row">
+        <a className="cta" href="#/flows">
+          Heal it
+        </a>
+      </div>
     </div>
   )
 }
