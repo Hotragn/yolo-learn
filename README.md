@@ -142,6 +142,8 @@ npm run build
 ## Test it with a real agent
 
 - **Chrome 149+** — enable `chrome://flags/#enable-webmcp-testing`, relaunch.
+  **Confirmed working:** the banner turns green and reports
+  `WebMCP detected on document.modelContext. 7 tool(s) registered with the browser.`
 - **ChatGPT desktop app** — open the deployed URL in the in-app browser.
 
 Then ask: *“Learn the site, then run the flow you just learned.”*

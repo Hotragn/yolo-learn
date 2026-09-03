@@ -7,6 +7,22 @@
 QA driven through a headless Chromium against the dev server, the local
 production build (`vite preview`), and the live Vercel deployment.
 
+**Native WebMCP is confirmed working.** On Chrome 149 with
+`chrome://flags/#enable-webmcp-testing` enabled, live production reports:
+
+> WebMCP detected on `document.modelContext`. **7 tool(s) registered with the browser.**
+
+That single line settles three things at once:
+
+1. `document.modelContext` is the live entry point — the primary detection path
+   is correct, and the `navigator.modelContext` fallback is not what fired.
+2. All seven built-in tools registered without an `InvalidStateError`, so the
+   name-uniquing holds against a real registry.
+3. `Origin-Agent-Cluster: ?1` is landing in production. Without it, every one of
+   those `registerTool()` calls would have rejected with `SecurityError` and the
+   banner would have been red — which is the requirement BUILD.md never
+   mentioned and the reason it is shipped in `vercel.json`.
+
 ---
 
 ## 1. Autonomous learning
@@ -143,7 +159,7 @@ One change per line of the site's own changelog, asserted by test.
 | Onboarding checklist | Ticks itself to 3/3 from real flow state |
 | Reset demo data | Clears flows, unregisters tools, empties the audit trail |
 | Firefox graceful degradation | **Verified by code path, not in Firefox.** All QA ran in a Chromium with no `document.modelContext` — the identical degradation path: amber banner naming the flag, every page functional, nothing thrown. |
-| Chrome with the WebMCP flag | **Not verified — see limitations** |
+| Chrome 149 with the WebMCP flag | **Verified.** Green banner, `document.modelContext`, 7 of 7 tools registered natively |
 | ChatGPT desktop in-app browser | **Not verified — see limitations** |
 
 ### Bugs the browser pass found that unit tests could not
@@ -218,13 +234,9 @@ lime (about 11:1) and lime-coloured text uses a darkened `--accent-ink` (about
 
 ## 7. Limitations — what is NOT verified
 
-- **Chrome 149+ with `chrome://flags/#enable-webmcp-testing`.** No such build is
-  available in this environment, so no tool has been registered with a real
-  `document.modelContext`. The integration is written against the spec IDL and
-  reports failures honestly rather than swallowing them: if `registerTool`
-  rejects, the tool still works through the mirror and the card shows the error.
-  **This is the one thing to check by hand before submitting.**
-- **The ChatGPT desktop in-app browser.** Same reason.
+- **The ChatGPT desktop in-app browser.** Not tested. Native registration is
+  confirmed on Chrome 149 (see the top of this document), so the remaining risk
+  is specific to that browser's WebMCP build rather than to this integration.
 - **Firefox itself.** The degradation path is verified; the browser is not.
 - **Discovery against arbitrary real-world sites.** It is unit-tested against
   fixtures with markup the demo site does not use (labels by `for`/`id`,
