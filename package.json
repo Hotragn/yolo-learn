@@ -1,5 +1,5 @@
 {
-  "name": "agent-memory-that-heals",
+  "name": "yolo-learn",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -23,5 +23,13 @@
     "typescript": "^5.5.3",
     "vite": "^5.4.1",
     "vitest": "^2.1.9"
+  },
+  "description": "An agent that learns a website by itself, mints a WebMCP tool mid-session, and heals when the site changes.",
+  "author": "Hotragn Pettugani",
+  "license": "MIT",
+  "homepage": "https://yolo-learn.vercel.app",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Hotragn/yolo-learn.git"
   }
 }
