@@ -6,7 +6,7 @@
  * Both announce here, so the Tools view celebrates identically either way.
  */
 
-export type MintSource = "demonstration" | "autonomous"
+export type MintSource = "demonstration" | "autonomous" | "url"
 
 export interface MintedInfo {
   flowId: string

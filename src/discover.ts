@@ -77,13 +77,26 @@ function headingFor(form: HTMLFormElement): string {
   return heading?.textContent?.trim() ?? ""
 }
 
+/** Short server names (`n`, `em`, `cc`) are stable ids, not how a human reads the task. */
+export function purposeLooksCryptic(purpose: string): boolean {
+  const t = purpose.trim().replace(/\s+/g, "")
+  if (!t) return true
+  return t.length <= 3 && /^[a-z0-9]+$/i.test(t)
+}
+
+function displayName(field: FieldSpec): string {
+  const label = field.label.trim()
+  if (purposeLooksCryptic(field.purpose) && label) return label
+  return field.purpose.trim() || label || "field"
+}
+
 function intentFrom(form: HTMLFormElement, fields: FieldSpec[]): string {
   const heading = headingFor(form).replace(STEP_PREFIX, "").trim()
   if (heading) return heading.toLowerCase()
   const legend = form.querySelector("legend")?.textContent?.trim()
   if (legend) return legend.toLowerCase()
   // Nothing labelled the step, so describe it by what it asks for.
-  return fields.length ? `provide ${fields.map((f) => f.purpose).join(", ")}` : "review and confirm"
+  return fields.length ? `provide ${fields.map(displayName).join(", ")}` : "review and confirm"
 }
 
 /**
@@ -490,18 +503,23 @@ export function readFormFromHTML(html: string): StaticReadResult {
   )
   const intent = intentFrom(form, fields)
 
-  const provenance = [...form.querySelectorAll<HTMLElement>("input, select, textarea")]
-    .filter((el) => fields.some((f) => f.label === labelOf(el)))
-    .map((el) => {
-      const field = fields.find((f) => f.label === labelOf(el))!
-      return {
-        purpose: field.purpose,
-        label: field.label,
-        from: provenanceOf(el),
-        required: !!field.required,
-        options: field.options,
+  const provenance = fields.map((field) => {
+    const el = [...form.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(
+      "input, select, textarea"
+    )].find((c) => {
+      if (c instanceof HTMLInputElement && ["submit", "button", "hidden", "image", "reset"].includes(c.type)) {
+        return false
       }
+      return purposeOf(c, labelOf(c)) === field.purpose
     })
+    return {
+      purpose: field.purpose,
+      label: field.label,
+      from: el ? provenanceOf(el) : "element order",
+      required: !!field.required,
+      options: field.options,
+    }
+  })
 
   return {
     ok: true,

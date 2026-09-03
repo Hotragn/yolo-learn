@@ -1,7 +1,8 @@
 import { useState } from "react"
 import { learnUrl, LearnUrlResult, recallRemote } from "./remote"
+import { EXAMPLE_PUBLIC_FORM } from "./page-fetch"
 import { logEvent } from "./store"
-import { IconAlert, IconCheck, IconRemember } from "./icons"
+import { IconAlert, IconCheck, IconCopy, IconRemember } from "./icons"
 
 function looksLikeUrl(value: string): boolean {
   try {
@@ -24,7 +25,9 @@ export function LearnUrlPanel({ compact = false }: { compact?: boolean }) {
   const [error, setError] = useState<string | null>(null)
   const [remote, setRemote] = useState<LearnUrlResult | null>(null)
 
-  const run = async () => {
+  const [copied, setCopied] = useState(false)
+
+  const run = async (force = false) => {
     const extra = trail
       .split(/\n/)
       .map((l) => l.trim())
@@ -32,7 +35,7 @@ export function LearnUrlPanel({ compact = false }: { compact?: boolean }) {
     const pages = [url.trim(), ...extra].filter(Boolean)
     const first = pages[0] ?? ""
     setError(null)
-    setRemote(null)
+    if (!force) setRemote(null)
     if (!first) {
       setError("Enter a public http or https URL.")
       return
@@ -45,9 +48,9 @@ export function LearnUrlPanel({ compact = false }: { compact?: boolean }) {
     try {
       const recalled = recallRemote(first)
       const out =
-        recalled.state === "hit" && extra.length === 0
-          ? await learnUrl(first)
-          : await learnUrl(first, { pages })
+        force || extra.length > 0 || recalled.state !== "hit"
+          ? await learnUrl(first, { pages: extra.length ? pages : undefined, force })
+          : await learnUrl(first)
       setRemote(out)
       logEvent("learn", out.summary)
       if (out.ok) setError(null)
@@ -64,14 +67,14 @@ export function LearnUrlPanel({ compact = false }: { compact?: boolean }) {
             <IconRemember size={17} /> Read a public site, then skip the re-read
           </h2>
           <p className="sub">
-            Paste a URL. The first visit fetches static HTML and stores the shape of the task. The next visit is a
-            lookup: no fetch, no re-walk. Open the site yourself if you want, click through, then add those URLs
-            below. GET only. Nothing is submitted on the target.
+            Paste a URL of a page that already has a form in its HTML. GitHub, Google, and most apps send an empty
+            shell, so those will not learn. GET only. Nothing is submitted on the target.
           </p>
         </>
       ) : (
         <p className="sub">
-          Paste a public URL. First visit reads and stores the task. Next visit fetches nothing.
+          Paste a public HTML form. First visit reads and stores the task. Next visit fetches nothing. JavaScript-only
+          pages will not have fields to learn.
         </p>
       )}
 
@@ -105,6 +108,16 @@ export function LearnUrlPanel({ compact = false }: { compact?: boolean }) {
             </button>
           </div>
         </div>
+        <button
+          type="button"
+          className="link trail-toggle"
+          onClick={() => {
+            setUrl(EXAMPLE_PUBLIC_FORM)
+            setError(null)
+          }}
+        >
+          Use a known-good example (W3C survey)
+        </button>
         <button
           type="button"
           className="link trail-toggle"
@@ -173,9 +186,10 @@ export function LearnUrlPanel({ compact = false }: { compact?: boolean }) {
                               {f.required && <small title="required"> *</small>}
                             </span>
                           ))}
-                      {s.refused.length > 0 && (
+                        {s.refused.length > 0 && (
                         <span className="refused-note" title="Refused (sensitive)">
-                          {" "}— refused {s.refused.length}
+                          {" "}
+                          - refused {s.refused.length}
                         </span>
                       )}
                     </td>
@@ -183,6 +197,50 @@ export function LearnUrlPanel({ compact = false }: { compact?: boolean }) {
                 ))}
               </tbody>
             </table>
+          )}
+          {remote.ok && remote.toolName && (
+            <div className="shared-mem">
+              <p>
+                <b>WebMCP tool minted</b>{" "}
+                <code>{remote.toolName}</code>
+                <button
+                  type="button"
+                  className="link"
+                  onClick={() => {
+                    void navigator.clipboard.writeText(remote.toolName!)
+                    setCopied(true)
+                    setTimeout(() => setCopied(false), 1500)
+                  }}
+                >
+                  <IconCopy size={14} /> {copied ? "Copied" : "Copy name"}
+                </button>
+              </p>
+              <p className="explain-note">
+                An agent can call this now. Default execute is a cache hit (no fetch). Pass refresh=true only to
+                re-read and see if the shape moved.
+              </p>
+              <div className="row">
+                <button type="button" disabled={busy} onClick={() => void run(true)}>
+                  Check if the shape moved
+                </button>
+              </div>
+            </div>
+          )}
+          {!remote.ok && (
+            <p className="explain-note">
+              <button
+                type="button"
+                className="link"
+                onClick={() => {
+                  setUrl(EXAMPLE_PUBLIC_FORM)
+                  setRemote(null)
+                  setError(null)
+                }}
+              >
+                Switch to the W3C survey example
+              </button>
+              , then click Remember this site. That page is a real HTML form and is what we test against.
+            </p>
           )}
         </section>
       )}

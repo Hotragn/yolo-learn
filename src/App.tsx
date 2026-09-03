@@ -1102,7 +1102,8 @@ function ToolsView() {
   }, [fresh])
 
   const flowTools = entries.filter((e) => e.flowId)
-  const builtIns = entries.filter((e) => !e.flowId)
+  const rememberedTools = entries.filter((e) => e.rememberedOrigin)
+  const builtIns = entries.filter((e) => !e.flowId && !e.rememberedOrigin)
 
   return (
     <main>
@@ -1114,7 +1115,11 @@ function ToolsView() {
             <p>
               Tool minted with {minted.paramCount} parameter{minted.paramCount === 1 ? "" : "s"}, live in this session
               with no reload
-              {minted.source === "autonomous" ? ", from reading the page alone" : ", from your demonstration"}
+              {minted.source === "url"
+                ? ", from a public URL (call it instead of fetching)"
+                : minted.source === "autonomous"
+                  ? ", from reading the page alone"
+                  : ", from your demonstration"}
               {minted.native ? ", registered with the browser" : ""}.
             </p>
             {minted.error && <small>Browser registration said: {minted.error}</small>}
@@ -1144,6 +1149,26 @@ function ToolsView() {
           </div>
         )}
         {flowTools.map((e) => (
+          <ToolCard key={e.tool.name} entry={e} highlight={fresh && minted?.name === e.tool.name} />
+        ))}
+      </div>
+
+      <h2 className="section-head">
+        <IconRemember size={17} /> From public URLs
+      </h2>
+      <div className="cards">
+        {rememberedTools.length === 0 && (
+          <div className="card empty">
+            <b>No public site remembered yet.</b>
+            <p className="sub">Paste a URL. The first read mints a tool named remembered_host that an agent can call without fetching again.</p>
+            <div className="row">
+              <a className="cta" href="#/any">
+                <IconRemember size={18} /> Paste a public URL
+              </a>
+            </div>
+          </div>
+        )}
+        {rememberedTools.map((e) => (
           <ToolCard key={e.tool.name} entry={e} highlight={fresh && minted?.name === e.tool.name} />
         ))}
       </div>

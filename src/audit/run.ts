@@ -1,5 +1,6 @@
 import { safeGetItem, safeSetItem } from "../types"
 import { Finding, Lens, LensReport, runLenses } from "./lenses"
+import { explainReadFailure, fetchRemotePage } from "../page-fetch"
 
 /**
  * Running the lenses, and remembering what they found.
@@ -256,18 +257,11 @@ export interface FetchedPage {
  * stated in the result rather than left to be discovered.
  */
 export async function auditUrl(url: string, options: RunOptions = {}): Promise<AuditResult & { page?: FetchedPage }> {
-  let page: FetchedPage
-  try {
-    const response = await fetch(`/api/fetch-page?url=${encodeURIComponent(url)}`)
-    page = (await response.json()) as FetchedPage
-  } catch (err) {
-    return {
-      ...summarise([], [`Could not reach the fetch endpoint: ${err instanceof Error ? err.message : String(err)}`]),
-    }
-  }
+  const page = await fetchRemotePage(url)
 
   if (page.error || !page.html) {
-    return { ...summarise([], [page.error ?? "Nothing came back from that URL."]), page }
+    const why = explainReadFailure(page.error ?? "Nothing came back from that URL.")
+    return { ...summarise([], [why]), page }
   }
 
   const origin = (() => {

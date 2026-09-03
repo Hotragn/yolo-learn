@@ -1,5 +1,6 @@
 import { safeGetItem, safeSetItem } from "./types"
 import { CrawlResult, readFlowAcrossPages, readPagesInOrder } from "./crawl"
+import { toolNameForOrigin } from "./remembered"
 
 /**
  * Memory for real sites, so a page is read once rather than once per visit.
@@ -122,6 +123,8 @@ export interface LearnUrlResult {
   stoppedBecause?: string
   bytesRead: number
   summary: string
+  /** Named WebMCP tool minted for this origin after a successful read. */
+  toolName?: string
 }
 
 /**
@@ -147,7 +150,7 @@ export async function learnUrl(
       const all = load()
       all[origin] = { ...recalled.memory, visits: recalled.memory.visits + 1 }
       save(all)
-      return {
+      const hit: LearnUrlResult = {
         ok: true,
         cached: true,
         origin,
@@ -156,7 +159,10 @@ export async function learnUrl(
         notes: ["Served from memory. No page was fetched and no markup was read."],
         bytesRead: 0,
         summary: recalled.summary,
+        toolName: toolNameForOrigin(origin),
       }
+      await mintRememberedFor(origin)
+      return hit
     }
   }
 
@@ -183,7 +189,7 @@ export async function learnUrl(
   const all = load()
   all[origin] = {
     origin,
-    startUrl: url,
+    startUrl: start,
     fingerprint,
     learnedAt: new Date().toISOString(),
     steps: crawl.steps,
@@ -193,6 +199,7 @@ export async function learnUrl(
   save(all)
 
   const moved = previous && previous.fingerprint !== fingerprint
+  await mintRememberedFor(origin)
   return {
     ok: true,
     cached: false,
@@ -208,5 +215,15 @@ export async function learnUrl(
       (moved
         ? `The shape CHANGED since last time (${previous!.fingerprint} to ${fingerprint}), so the stored task moved.`
         : `Stored as ${fingerprint}. The next visit is a free cache hit.`),
+    toolName: toolNameForOrigin(origin),
+  }
+}
+
+async function mintRememberedFor(origin: string) {
+  try {
+    const { mintRememberedTool } = await import("./webmcp")
+    await mintRememberedTool(origin)
+  } catch {
+    /* Memory is already stored. Minting is how an agent sees it. */
   }
 }

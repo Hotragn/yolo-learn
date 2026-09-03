@@ -114,4 +114,30 @@ describe("label reading", () => {
     </form>`)
     expect(r.provenance[0].label).toBe("Phone number")
   })
+
+  it("describes cryptic name attributes with the visible label", () => {
+    const r = readFormFromHTML(`<form>
+      <label>Name <input name="n" required></label>
+      <label>Email <input name="em" type="email"></label>
+      <button>Submit comments</button>
+    </form>`)
+    expect(r.ok).toBe(true)
+    expect(r.provenance.map((p) => p.purpose)).toEqual(["n", "em"])
+    expect(r.intent).toMatch(/Name/)
+    expect(r.intent).toMatch(/Email/)
+    expect(r.intent).not.toBe("provide n, em")
+  })
+
+  it("counts a radio group as one field, not one per button", () => {
+    const r = readFormFromHTML(`<form>
+      <p>Score</p>
+      <input type="radio" name="res" value="1">
+      <input type="radio" name="res" value="2">
+      <input type="radio" name="res" value="3">
+      <label>Email <input name="em"></label>
+      <button>Go</button>
+    </form>`)
+    expect(r.fields.map((f) => f.purpose)).toEqual(["res", "em"])
+    expect(r.provenance).toHaveLength(2)
+  })
 })

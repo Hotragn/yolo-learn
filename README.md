@@ -15,7 +15,7 @@
   <img src="https://img.shields.io/badge/WebMCP-registerTool-7BD40A?style=flat-square&labelColor=0B1220" alt="WebMCP">
   <img src="https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript">
   <img src="https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=0B1220" alt="React">
-  <img src="https://img.shields.io/badge/tests-214-passing-7BD40A?style=flat-square&labelColor=0B1220" alt="214 tests">
+  <img src="https://img.shields.io/badge/tests-222-passing-7BD40A?style=flat-square&labelColor=0B1220" alt="222 tests">
   <img src="https://img.shields.io/badge/license-MIT-0B1220?style=flat-square" alt="MIT">
 </p>
 
@@ -93,6 +93,7 @@ What that file actually handles: `document` then `navigator` feature-detect; `re
 | --- | --- |
 | `recall_page` / `recall_url` | Do I already know this? Call first. A hit is the time saving. |
 | `learn_site` / `learn_url` | First visit. `pages` = URLs the user already opened by hand. |
+| `remembered_<host>` | Minted mid-session after a public URL is learned. Call it instead of fetching. `refresh=true` re-reads. |
 | `start_teaching` | Human fills the clinic; the app watches. |
 | `run_flow` / minted name | Drive the task. Human owns irreversible steps. |
 | `check_flow_health` / `heal_flow` | Redesign. At most one question. |

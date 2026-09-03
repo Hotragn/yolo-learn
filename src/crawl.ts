@@ -1,4 +1,5 @@
 import { readFormFromHTML, StaticReadResult } from "./discover"
+import { explainReadFailure, fetchRemotePage } from "./page-fetch"
 
 /**
  * Read a task that spans several pages, on a site nobody here wrote.
@@ -45,21 +46,6 @@ export interface CrawlResult {
 const NEXT_TEXT = /^\s*(next|continue|proceed|checkout|check\s*out|start|begin|get\s+started|sign\s*up|register|apply)\b/i
 const MAX_STEPS = 6
 const MAX_HTML = 400_000
-
-interface FetchedPage {
-  html?: string
-  finalUrl?: string
-  error?: string
-}
-
-async function fetchPage(url: string): Promise<FetchedPage> {
-  try {
-    const response = await fetch(`/api/fetch-page?url=${encodeURIComponent(url)}`)
-    return (await response.json()) as FetchedPage
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : String(err) }
-  }
-}
 
 function parse(html: string): Document {
   return new DOMParser().parseFromString(html.slice(0, MAX_HTML), "text/html")
@@ -157,9 +143,9 @@ export async function readFlowAcrossPages(
     seen.add(url)
 
     progress(`reading page ${i + 1}: ${url.replace(origin, "")}`)
-    const page = await fetchPage(url)
+    const page = await fetchRemotePage(url)
     if (page.error || !page.html) {
-      stoppedBecause = page.error ?? "That page returned nothing."
+      stoppedBecause = explainReadFailure(page.error ?? "That page returned nothing.")
       break
     }
 
@@ -174,7 +160,7 @@ export async function readFlowAcrossPages(
     if (read.ok) {
       steps.push(toStep(steps.length + 1, landed, read))
     } else if (steps.length === 0) {
-      stoppedBecause = read.message || "No form on the first page."
+      stoppedBecause = explainReadFailure(read.message || "No form on the first page.")
       break
     } else {
       notes.push(`Page ${i + 1} had no readable form, so it is not counted as a step.`)
@@ -271,9 +257,9 @@ export async function readPagesInOrder(
     seen.add(url)
 
     progress(`reading page you opened (${i + 1}/${cleaned.length})`)
-    const page = await fetchPage(url)
+    const page = await fetchRemotePage(url)
     if (page.error || !page.html) {
-      stoppedBecause = page.error ?? "That page returned nothing."
+      stoppedBecause = explainReadFailure(page.error ?? "That page returned nothing.")
       break
     }
     bytesRead += page.html.length
@@ -293,6 +279,9 @@ export async function readPagesInOrder(
   }
 
   notes.push("Read-only: GET requests only, from the pages you listed. Nothing submitted.")
+  if (steps.length === 0 && /no readable form/i.test(notes.join(" "))) {
+    stoppedBecause = explainReadFailure("No form controls in there.")
+  }
   return {
     ok: steps.length > 0,
     startUrl: cleaned[0],

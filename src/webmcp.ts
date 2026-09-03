@@ -39,7 +39,9 @@ import { detectDrift, effectiveStatus, healFlow, storedValue } from "./drift"
 import { loadRun, normalizeParams, runFlowInteractive } from "./runner"
 import { auditDocument, auditUrl } from "./audit/run"
 import { knownRemotes, learnUrl, recallRemote } from "./remote"
+import { rememberedDescription, toolNameForOrigin } from "./remembered"
 import { beginTeaching } from "./TeachMode"
+import { announceMint } from "./minted"
 
 export interface ToolAnnotations {
   readOnlyHint?: boolean
@@ -113,6 +115,7 @@ export interface ToolEntry {
   native: boolean
   mintedThisSession: boolean
   flowId?: string
+  rememberedOrigin?: string
   error?: string
 }
 
@@ -191,7 +194,7 @@ function tolerant(tool: WebMCPTool): WebMCPTool {
 
 export async function registerTool(
   tool: WebMCPTool,
-  opts: { mintedThisSession?: boolean; flowId?: string } = {}
+  opts: { mintedThisSession?: boolean; flowId?: string; rememberedOrigin?: string } = {}
 ): Promise<RegisterOutcome> {
   if (registry.has(tool.name)) {
     return { name: tool.name, native: registry.get(tool.name)!.native, error: "already registered" }
@@ -224,6 +227,7 @@ export async function registerTool(
     native,
     mintedThisSession: !!opts.mintedThisSession,
     flowId: opts.flowId,
+    rememberedOrigin: opts.rememberedOrigin,
     error,
   })
   emit()
@@ -326,21 +330,35 @@ export async function registerStaticTools(): Promise<void> {
   await registerTool({
     name: "list_flows",
     description:
-      "List every known flow across all sites, with health status and the parameters each accepts. Each flow " +
-      "also exists as its own tool, named after the flow. For \"do I know THIS page\", call recall_page instead: " +
-      "it is scoped to the current origin and tells you whether what is stored still matches.",
+      "List taught clinic flows AND remembered public sites. Each remembered origin is also its own " +
+      "WebMCP tool (remembered_<host>). Call that tool instead of fetching; pass refresh=true only to re-read.",
     inputSchema: { type: "object", properties: {} },
     annotations: { readOnlyHint: true, untrustedContentHint: true },
     execute: async (_args, { signal }) => {
       const bad = aborted(signal)
       if (bad) return bad
       const flows = loadFlows()
+      const remotes = knownRemotes()
       return {
-        summary: flows.length
-          ? `${flows.length} taught flow(s): ${flows.map((f) => `${f.name} (${f.status})`).join(", ")}`
-          : "No flows taught yet. Call start_teaching to have the user demonstrate one.",
+        summary: [
+          flows.length
+            ? `${flows.length} taught flow(s): ${flows.map((f) => `${f.name} (${f.status})`).join(", ")}`
+            : "No clinic flows taught yet.",
+          remotes.length
+            ? `${remotes.length} remembered site(s): ${remotes.map((m) => toolNameForOrigin(m.origin)).join(", ")}`
+            : "No public URLs remembered yet. Call learn_url.",
+        ].join(" "),
         siteVersion: getActiveSiteModel().version,
         flows: flows.map(flowSummary),
+        rememberedSites: remotes.map((m) => ({
+          tool: toolNameForOrigin(m.origin),
+          origin: m.origin,
+          fingerprint: m.fingerprint,
+          visits: m.visits,
+          bytesReadFirstTime: m.bytesRead,
+          steps: m.steps.length,
+          fields: m.steps.reduce((n, s) => n + s.fields.length, 0),
+        })),
       }
     },
   })
@@ -715,6 +733,7 @@ export async function registerStaticTools(): Promise<void> {
         summary: out.summary,
         servedFromMemory: out.cached,
         origin: out.origin,
+        tool: out.toolName,
         fingerprint: out.fingerprint,
         bytesRead: out.bytesRead,
         steps: out.steps.map((st) => ({
@@ -941,6 +960,91 @@ export async function mintFlowTool(
   )
 }
 
+export async function mintRememberedTool(origin: string): Promise<RegisterOutcome | null> {
+  const memory = knownRemotes().find((m) => m.origin === origin)
+  if (!memory) return null
+  const name = toolNameForOrigin(origin)
+  const existing = registry.get(name)
+  if (existing) return { name, native: existing.native, error: existing.error }
+  const fieldCount = memory.steps.reduce((n, s) => n + s.fields.length, 0)
+  const outcome = await registerTool(
+    {
+      name,
+      description: rememberedDescription(memory),
+      inputSchema: {
+        type: "object",
+        properties: {
+          refresh: {
+            type: "boolean",
+            description:
+              "If true, GET the page again and compare fingerprints. Default false: return memory, no fetch.",
+          },
+        },
+      },
+      annotations: { readOnlyHint: true, untrustedContentHint: true },
+      execute: async (args, { signal }) => {
+        const bad = aborted(signal)
+        if (bad) return bad
+        const refresh = args.refresh === true
+        if (refresh) {
+          const out = await learnUrl(memory.startUrl, { force: true })
+          return {
+            summary: out.summary,
+            servedFromMemory: out.cached,
+            origin: out.origin,
+            tool: name,
+            fingerprint: out.fingerprint,
+            bytesRead: out.bytesRead,
+            shapeChanged: out.summary.includes("CHANGED"),
+            steps: out.steps.map((st) => ({
+              order: st.order,
+              url: st.url,
+              intent: st.intent,
+              fields: st.fields.map((f) => ({ purpose: f.purpose, label: f.label, required: f.required })),
+            })),
+          }
+        }
+        const fresh = knownRemotes().find((m) => m.origin === origin)
+        if (!fresh) return { error: `Nothing remembered for ${origin}. Call learn_url.` }
+        return {
+          summary:
+            `${origin} from memory: ${fresh.steps.length} step(s), ${fresh.steps.reduce((n, s) => n + s.fields.length, 0)} field(s). ` +
+            `Fetched nothing. First read cost ${Math.round(fresh.bytesRead / 1024)}KB.`,
+          servedFromMemory: true,
+          origin,
+          tool: name,
+          fingerprint: fresh.fingerprint,
+          bytesRead: 0,
+          bytesReadFirstTime: fresh.bytesRead,
+          visits: fresh.visits,
+          steps: fresh.steps.map((st) => ({
+            order: st.order,
+            url: st.url,
+            intent: st.intent,
+            fields: st.fields.map((f) => ({ purpose: f.purpose, label: f.label, required: f.required })),
+          })),
+        }
+      },
+    },
+    { mintedThisSession: true, rememberedOrigin: origin }
+  )
+  announceMint({
+    flowId: origin,
+    name,
+    paramCount: fieldCount,
+    native: outcome.native,
+    source: "url",
+    error: outcome.error,
+  })
+  return outcome
+}
+
+export async function mintRememberedTools(): Promise<void> {
+  for (const memory of knownRemotes()) {
+    if (!registry.has(toolNameForOrigin(memory.origin))) await mintRememberedTool(memory.origin)
+  }
+}
+
 /**
  * The native registry does not survive a reload, but taught flows do. Re-mint
  * every stored flow at startup so a returning user's tools are all there.
@@ -967,6 +1071,7 @@ export function initTools(): Promise<void> {
     initPromise = (async () => {
       await registerStaticTools()
       await mintStoredFlows()
+      await mintRememberedTools()
     })()
   }
   return initPromise
