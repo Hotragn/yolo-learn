@@ -29,6 +29,8 @@ export interface DiscoveredFlow {
   /** Purpose -> probe value, for the audit trail. Never persisted as data. */
   probes: Record<string, string>
   notes: string[]
+  /** Labels of credential or payment fields that were refused outright. */
+  refused: string[]
 }
 
 export interface DiscoverResult {
@@ -39,6 +41,9 @@ export interface DiscoverResult {
 
 const NEXT_LABEL = /^(next|continue|proceed|forward|onward)\b/i
 const STEP_COUNTER = /step\s+(\d+)\s+of\s+(\d+)/i
+// Real headings do use en and em dashes as separators, so the class has to
+// match them. Written as unicode escapes so a copy-level dash purge cannot
+// collapse them into an invalid range.
 const STEP_PREFIX = /^\s*step\s+\d+(\s+of\s+\d+)?\s*[:.–—-]\s*/i
 
 const settle = () =>
@@ -141,6 +146,28 @@ function isVisible(el: HTMLElement): boolean {
   return true
 }
 
+/**
+ * Fields this must never read, store, or fill.
+ *
+ * Discovery walks pages it has never seen, so sooner or later it meets a login
+ * wall or a checkout form. A credential or a card number is not a "field it
+ * learned" - it is something it has no business touching, and no amount of
+ * user intent makes storing it acceptable. These are skipped entirely and
+ * reported, so the flow stops with an explanation instead of quietly
+ * capturing a password field's shape.
+ */
+const SENSITIVE_AUTOCOMPLETE =
+  /^(current-password|new-password|cc-|one-time-code|cc-number|cc-exp|cc-csc)/i
+const SENSITIVE_NAME = /(password|passwd|pwd|cvv|cvc|card.?number|ssn|secret|otp|pin)/i
+
+export function isSensitive(el: HTMLElement): boolean {
+  if (el instanceof HTMLInputElement && el.type === "password") return true
+  const autocomplete = el.getAttribute("autocomplete") ?? ""
+  if (SENSITIVE_AUTOCOMPLETE.test(autocomplete)) return true
+  const name = `${el.getAttribute("name") ?? ""} ${el.getAttribute("id") ?? ""}`
+  return SENSITIVE_NAME.test(name)
+}
+
 function typeOf(el: HTMLElement): FieldType {
   if (el instanceof HTMLSelectElement) return "select"
   const type = (el.getAttribute("type") ?? "text").toLowerCase()
@@ -150,7 +177,7 @@ function typeOf(el: HTMLElement): FieldType {
   return "text"
 }
 
-function readFields(form: HTMLFormElement): FieldSpec[] {
+function readFields(form: HTMLFormElement, refused: string[]): FieldSpec[] {
   const fields: FieldSpec[] = []
   const controls = form.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(
     "input, select, textarea"
@@ -158,6 +185,11 @@ function readFields(form: HTMLFormElement): FieldSpec[] {
   for (const el of controls) {
     if (el instanceof HTMLInputElement && ["submit", "button", "hidden", "image", "reset"].includes(el.type)) continue
     if (el.disabled || !isVisible(el)) continue
+    if (isSensitive(el)) {
+      const refusedLabel = labelOf(el)
+      if (!refused.includes(refusedLabel)) refused.push(refusedLabel)
+      continue
+    }
     const label = labelOf(el)
     const purpose = purposeOf(el, label)
     if (fields.some((f) => f.purpose === purpose)) continue
@@ -243,6 +275,7 @@ export async function discoverFlow(options: DiscoverOptions = {}): Promise<Disco
   const steps: StepSpec[] = []
   const probes: Record<string, string> = {}
   const notes: string[] = []
+  const refused: string[] = []
   const toolName = nameFrom(first)
   const siteTitle = document.querySelector("h2, h1")?.textContent?.trim() ?? document.title
 
@@ -254,13 +287,23 @@ export async function discoverFlow(options: DiscoverOptions = {}): Promise<Disco
     }
 
     const heading = headingFor(form)
-    const fields = readFields(form)
+    const fields = readFields(form, refused)
     const intent = intentFrom(form, fields)
     const submit = submitButton(form)
     const submitLabel = labelOfButton(submit)
 
     if (steps.some((s) => s.intent === intent)) {
       notes.push(`Stopped at "${intent}": the page stopped advancing.`)
+      break
+    }
+
+    // A step whose only inputs were refused is a sign-in or payment wall.
+    // Walking further would mean filling it, so the walk ends here.
+    if (fields.length === 0 && refused.length > 0) {
+      notes.push(
+        `Stopped at "${intent}": it asks for ${refused.join(", ")}, which this will not read or fill. ` +
+          `Sign in first, then learn the flow.`
+      )
       break
     }
 
@@ -306,6 +349,7 @@ export async function discoverFlow(options: DiscoverOptions = {}): Promise<Disco
       siteTitle,
       probes,
       notes,
+      refused,
     },
   }
 }

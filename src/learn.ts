@@ -14,6 +14,8 @@ export interface LearnOutcome {
   steps?: { order: number; intent: string; submitLabel: string; fields: string[] }[]
   parameters?: { key: string; describes: string; required: boolean; oneOf?: string[] }[]
   notes?: string[]
+  /** Credential or payment fields it refused to read. */
+  refusedFields?: string[]
   native?: boolean
 }
 
@@ -93,6 +95,12 @@ export async function learnCurrentSite(
     "learn",
     `Learned "${name}" autonomously by reading ${flow.steps.length} step(s) and ${flow.params.length} field(s). No demonstration.`
   )
+  if (discovered.refused.length) {
+    logEvent(
+      "learn",
+      `Refused to read ${discovered.refused.length} credential or payment field(s): ${discovered.refused.join(", ")}.`
+    )
+  }
   if (Object.keys(discovered.probes).length) {
     logEvent(
       "learn",
@@ -138,6 +146,7 @@ export async function learnCurrentSite(
       }
     }),
     notes: discovered.notes,
+    refusedFields: discovered.refused,
     native: !!outcome?.native,
   }
 }
