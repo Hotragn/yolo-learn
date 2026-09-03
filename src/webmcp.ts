@@ -162,6 +162,32 @@ export interface RegisterOutcome {
   error?: string
 }
 
+/**
+ * Make a tool survive being called the way real implementations call it.
+ *
+ * The spec says execute receives (inputObject, {signal}) with signal required.
+ * ChatGPT's in-app browser sends an options object with NO signal, so every
+ * `const bad = aborted(signal)` read `.aborted` off undefined and threw
+ * "Cannot read properties of undefined (reading 'aborted')" before the tool
+ * body ran. Native discovery worked; native invocation crashed on every call,
+ * which is the worst kind of failure because the tool list looked perfect.
+ *
+ * The lesson generalises past this one bug: an experimental API means every
+ * argument an implementation is supposed to pass is an argument some
+ * implementation will not pass. Normalising once at the boundary is cheaper
+ * than trusting fourteen call sites, and it cannot be forgotten by the next
+ * tool someone adds.
+ */
+const NEVER_ABORTS = new AbortController().signal
+
+function tolerant(tool: WebMCPTool): WebMCPTool {
+  return {
+    ...tool,
+    execute: (args, options) =>
+      tool.execute(args ?? {}, { signal: options?.signal ?? NEVER_ABORTS }),
+  }
+}
+
 export async function registerTool(
   tool: WebMCPTool,
   opts: { mintedThisSession?: boolean; flowId?: string } = {}
@@ -179,7 +205,7 @@ export async function registerTool(
     try {
       // registerTool returns a Promise. Awaiting it is the only way to learn
       // that the name collided or that the document is not origin-keyed.
-      await ctx.mc.registerTool(tool, { signal: controller.signal })
+      await ctx.mc.registerTool(tolerant(tool), { signal: controller.signal })
       controllers.set(tool.name, controller)
       native = true
       attachNativeChangeHook()
@@ -193,7 +219,7 @@ export async function registerTool(
   }
 
   registry.set(tool.name, {
-    tool,
+    tool: tolerant(tool),
     native,
     mintedThisSession: !!opts.mintedThisSession,
     flowId: opts.flowId,
@@ -234,8 +260,10 @@ export async function executeToolByName(
 type Bad = { error: string }
 const isBad = (v: unknown): v is Bad => !!v && typeof v === "object" && "error" in (v as object)
 
-function aborted(signal: AbortSignal): Bad | null {
-  return signal.aborted ? { error: "Cancelled before the tool ran." } : null
+function aborted(signal?: AbortSignal): Bad | null {
+  // Defensive even with the wrapper above: a tool added later might be called
+  // through some path that bypasses it.
+  return signal?.aborted ? { error: "Cancelled before the tool ran." } : null
 }
 
 /**

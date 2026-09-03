@@ -51,6 +51,7 @@
   --shadow: 0 1px 2px rgba(22, 22, 26, 0.05), 0 10px 30px -22px rgba(22, 22, 26, 0.4);
   --mono-legacy: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Mono", Menlo, Consolas, monospace;
 
+  --action-hover: #000000;
   --logo-bg: #1a1a17;
   --logo-ring: #faf9f5;
   --logo-mark: #fafaf8;
@@ -69,6 +70,7 @@
     --border: #2e2d25;
     --border-strong: #434135;
 
+    --action-hover: #ffffff;
     --accent: #f2f2f0;
     --accent-ink: #f2f2f0;
     --accent-wash: #1b1b16;
@@ -98,6 +100,7 @@
   --page: #0d0d0b;
   --border: #2e2d25;
   --border-strong: #434135;
+  --action-hover: #ffffff;
   --accent: #f2f2f0;
   --accent-ink: #f2f2f0;
   --accent-wash: #1b1b16;
@@ -1440,8 +1443,11 @@ button,
 button,
 .cta {
   font-size: 15px;
-  border-radius: 8px;
-  padding: 9px 16px;
+  /* Pill, per the linear.app measurement (radius 9999, padding 0 20px). A pill
+     needs more horizontal padding than a rounded rectangle, or the text
+     crowds the curve. */
+  border-radius: 999px;
+  padding: 9px 20px;
   transition: background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease;
 }
 
@@ -1453,15 +1459,13 @@ button.primary,
   border: 1px solid var(--ink);
   color: var(--page);
 }
+/* Hover reads from a token, so it is correct in light, in dark, and in the
+   case that actually broke: theme "system" on a dark OS, where no data-theme
+   attribute exists and an attribute-scoped override never matches. */
 button.primary:hover,
 .cta:hover {
-  background: #000;
-  border-color: #000;
-}
-:root[data-theme="dark"] button.primary:hover,
-:root[data-theme="dark"] .cta:hover {
-  background: #fff;
-  border-color: #fff;
+  background: var(--action-hover);
+  border-color: var(--action-hover);
 }
 
 /* Secondary: a plain surface with a hairline, per vercel's second button. */
@@ -1506,3 +1510,12 @@ button:disabled {
 @media (prefers-reduced-motion: reduce) {
   button, .cta { transition: none; }
 }
+
+/* Shape system: actions are pills, surfaces are 12px, inputs are 8px. One
+   documented rule rather than three accidents. */
+input,
+select,
+textarea { border-radius: 8px; }
+.tour-launch,
+.badge,
+.fake-badge { border-radius: 999px; }
