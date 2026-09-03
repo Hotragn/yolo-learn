@@ -15,9 +15,23 @@ type Executor = (flow: TaughtFlow, params: Record<string, unknown>, signal: Abor
 
 let executor: Executor | null = null
 let running = false
+let resetter: (() => void) | null = null
 
 export function setRunExecutor(fn: Executor | null) {
   executor = fn
+}
+
+/** The site view registers a way to put the wizard back to step one. */
+export function setSiteReset(fn: (() => void) | null) {
+  resetter = fn
+}
+
+export function resetSite() {
+  resetter?.()
+}
+
+export function isSiteMounted(): boolean {
+  return executor !== null
 }
 
 export function isRunning(): boolean {

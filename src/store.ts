@@ -5,7 +5,7 @@ const AUDIT_KEY = "audit.v1"
 
 export interface AuditEvent {
   at: string
-  type: "teach" | "mint" | "run" | "drift" | "heal" | "confirm" | "delete"
+  type: "teach" | "learn" | "mint" | "run" | "drift" | "heal" | "confirm" | "delete"
   detail: string
 }
 

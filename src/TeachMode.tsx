@@ -2,6 +2,7 @@ import { ReactNode, createContext, useCallback, useContext, useEffect, useMemo, 
 import { camel, getActiveSiteModel, siteHash, TaughtFlow, uniqueName } from "./types"
 import { flowNames, logEvent, upsertFlow } from "./store"
 import { mintFlowTool } from "./webmcp"
+import { announceMint } from "./minted"
 
 export interface RecordedField {
   stepIntent: string
@@ -9,15 +10,6 @@ export interface RecordedField {
   label: string
   value: string
   isParam: boolean
-}
-
-export interface MintedInfo {
-  flowId: string
-  name: string
-  paramCount: number
-  native: boolean
-  error?: string
-  at: number
 }
 
 interface TeachState {
@@ -37,9 +29,6 @@ interface TeachContextValue extends TeachState {
   finalize: (nameOverride?: string) => Promise<TaughtFlow | null>
   reset: () => void
   minting: boolean
-  /** Set for the rest of the session after a mint, so Tools can celebrate it. */
-  justMinted: MintedInfo | null
-  clearJustMinted: () => void
 }
 
 const TeachContext = createContext<TeachContextValue | null>(null)
@@ -66,7 +55,6 @@ const EMPTY: TeachState = { active: false, flowName: "", captured: [], done: fal
 export function TeachProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<TeachState>(EMPTY)
   const [minting, setMinting] = useState(false)
-  const [justMinted, setJustMinted] = useState<MintedInfo | null>(null)
 
   const start = useCallback((name?: string) => {
     setState({ active: true, flowName: name ?? "my_flow", captured: [], done: false })
@@ -97,6 +85,7 @@ export function TeachProvider({ children }: { children: ReactNode }) {
       id: `flow_${Date.now()}`,
       name,
       intent: `${name.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase())} at Northside Family Clinic`,
+      learnedBy: "demonstration",
       taughtAt: new Date().toISOString(),
       siteVersionAtTeach: site.version,
       params: captured
@@ -126,13 +115,13 @@ export function TeachProvider({ children }: { children: ReactNode }) {
         `Minted tool "${flow.name}" with ${flow.params.length} parameter(s)` +
           (outcome?.native ? " and registered it with the browser" : " (mirror registry only)")
       )
-      setJustMinted({
+      announceMint({
         flowId: flow.id,
         name: flow.name,
         paramCount: flow.params.length,
         native: !!outcome?.native,
+        source: "demonstration",
         error: outcome?.error,
-        at: Date.now(),
       })
       setState(EMPTY)
       location.hash = "#/tools"
@@ -146,8 +135,6 @@ export function TeachProvider({ children }: { children: ReactNode }) {
     () => ({
       ...state,
       minting,
-      justMinted,
-      clearJustMinted: () => setJustMinted(null),
       recordField: (f) =>
         setState((s) => {
           const i = s.captured.findIndex((c) => c.fieldPurpose === f.fieldPurpose)
@@ -169,7 +156,7 @@ export function TeachProvider({ children }: { children: ReactNode }) {
       finalize,
       reset: () => setState(EMPTY),
     }),
-    [state, minting, justMinted, finalize]
+    [state, minting, finalize]
   )
 
   return <TeachContext.Provider value={value}>{children}</TeachContext.Provider>

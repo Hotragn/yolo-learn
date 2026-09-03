@@ -27,7 +27,7 @@
 
 import { coerceValue, getActiveSiteModel, TaughtFlow } from "./types"
 import { getFlow, loadFlows, logEvent, patchFlow } from "./store"
-import { detectDrift, effectiveStatus, healFlow } from "./drift"
+import { detectDrift, effectiveStatus, healFlow, storedValue } from "./drift"
 import { normalizeParams, runFlowInteractive } from "./runner"
 import { beginTeaching } from "./TeachMode"
 
@@ -385,7 +385,7 @@ export async function registerStaticTools(): Promise<void> {
           ...report,
           needsHealing: true,
           summary: `${flow.name} cannot run yet: ${report.summary}`,
-          message: "The site changed since this flow was taught. Ask the user these questions, then call heal_flow.",
+          message: "The site changed since this flow was learned. Ask the user these questions, then call heal_flow.",
         }
       }
 
@@ -483,10 +483,31 @@ export async function registerStaticTools(): Promise<void> {
   })
 
   await registerTool({
+    name: "learn_site",
+    description:
+      "Learn the task on the current page autonomously, with no human demonstration. Reads the form the way a " +
+      "screen reader would - labels, field names, required flags, option lists - walks the wizard with throwaway " +
+      "values, and mints a tool for what it found. Every field it discovers becomes a parameter you supply at call " +
+      "time; it never invents a person's details. Use this first on a site the user has not taught. It will not " +
+      "press a button unless that button clearly means \"next\", so it cannot submit anything.",
+    inputSchema: { type: "object", properties: {} },
+    annotations: { readOnlyHint: false, untrustedContentHint: true },
+    execute: async (_args, { signal }) => {
+      const bad = aborted(signal)
+      if (bad) return bad
+      // Imported lazily: learn.ts needs mintFlowTool from this module, and a
+      // dynamic import keeps that cycle out of the module graph.
+      const { learnCurrentSite } = await import("./learn")
+      return learnCurrentSite({ signal })
+    },
+  })
+
+  await registerTool({
     name: "start_teaching",
     description:
-      "Put the page into teach mode so the user can demonstrate a task by hand. When they finish, the app mints " +
-      "a new tool named after the flow, available immediately in this same session.",
+      "Put the page into teach mode so the user can demonstrate a task by hand, and remember the values they " +
+      "enter. Prefer learn_site when you only need the shape of the task; use this when the user wants their own " +
+      "details replayed on every run. Either way the app mints a tool immediately, in this same session.",
     inputSchema: {
       type: "object",
       properties: {
@@ -532,12 +553,24 @@ function parseAnswers(raw: unknown): Record<string, string> | Bad {
 // --- dynamic minting: the magic moment -----------------------------------
 
 function mintedDescription(flow: TaughtFlow): string {
+  const when = new Date(flow.taughtAt).toLocaleDateString()
   const paramList = flow.params.length
     ? flow.params.map((p) => `${p.key} (${p.sourceField.fieldPurpose})`).join(", ")
-    : "no parameters - it replays the demonstrated values exactly"
+    : "no parameters"
+
+  // How the flow was learned changes what is true about its parameters, so it
+  // has to change the description too. An autonomously learned flow stored no
+  // values at all, and telling an agent it can omit a parameter and get the
+  // demonstrated one back would simply be false.
+  const provenance =
+    flow.learnedBy === "autonomous"
+      ? `Learned on ${when} by reading the page itself, with no demonstration and no stored values, ` +
+        `so every parameter has to be supplied.`
+      : `Taught on ${when} by the user demonstrating it once. Any parameter you omit falls back to the value ` +
+        `they demonstrated.`
+
   return (
-    `${flow.intent}. Taught by the user on ${new Date(flow.taughtAt).toLocaleDateString()} by demonstrating it once. ` +
-    `Parameters: ${paramList}. Anything you omit reuses the demonstrated value. ` +
+    `${flow.intent}. ${provenance} Parameters: ${paramList}. ` +
     `Prefer this over filling the booking form step by step. The user approves the final submit on screen.`
   )
 }
@@ -550,6 +583,7 @@ export async function mintFlowTool(
   if (!flow) return null
 
   const properties: Record<string, unknown> = {}
+  const required: string[] = []
   for (const p of flow.params) {
     const field = getActiveSiteModel()
       .steps.flatMap((s) => s.fields)
@@ -567,15 +601,17 @@ export async function mintFlowTool(
           : purpose,
       ...(field?.options?.length ? { enum: field.options } : {}),
     }
+    // Optional where a demonstrated value can stand in, required where the
+    // app has nothing to fall back on. Saying so in the schema is how the
+    // agent knows without having to try and fail.
+    if (storedValue(flow, p.sourceField.fieldPurpose) === undefined) required.push(p.key)
   }
 
   return registerTool(
     {
       name: flow.name,
       description: mintedDescription(flow),
-      // Every parameter is optional: omitting one replays the demonstrated
-      // value, which is the whole point of a taught flow.
-      inputSchema: { type: "object", properties },
+      inputSchema: { type: "object", properties, ...(required.length ? { required } : {}) },
       annotations: { readOnlyHint: false, untrustedContentHint: true },
       execute: async (args, { signal }) => {
         const bad = aborted(signal)

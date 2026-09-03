@@ -143,10 +143,17 @@ export interface RunRecord {
   message: string
 }
 
+/**
+ * How the app came to know a flow. "autonomous" means it read the page itself
+ * and nobody demonstrated anything.
+ */
+export type LearnedBy = "demonstration" | "autonomous"
+
 export interface TaughtFlow {
   id: string
   name: string
   intent: string
+  learnedBy?: LearnedBy
   taughtAt: string
   siteVersionAtTeach: string
   params: FlowParam[]

@@ -67,7 +67,15 @@ function questionFor(field: FieldSpec): DriftQuestion {
 export function detectDrift(flow: TaughtFlow, current: SiteModel): DriftReport {
   const changes: DriftChange[] = []
   const questions: DriftQuestion[] = []
-  const needsAnswer = (f: FieldSpec) => !!f.required && storedValue(flow, f.purpose) === undefined
+
+  // A field the flow declares as a parameter is the caller's responsibility:
+  // it is in the tool's input schema, marked required when there is no stored
+  // fallback, so asking the human about it would be asking the wrong party.
+  // This is what lets an autonomously learned flow - every field a parameter,
+  // no invented values - come out of discovery with nothing to ask.
+  const parameterised = new Set(flow.params.map((p) => p.sourceField.fieldPurpose))
+  const needsAnswer = (f: FieldSpec) =>
+    !!f.required && storedValue(flow, f.purpose) === undefined && !parameterised.has(f.purpose)
 
   const taughtByIntent = new Map<string, StepSpec>(flow.steps.map((s) => [s.intent, s]))
 
@@ -170,7 +178,9 @@ export function effectiveStatus(flow: TaughtFlow, report: DriftReport): TaughtFl
 
 function summarize(changes: DriftChange[], questions: DriftQuestion[]): string {
   if (!changes.length && !questions.length) return "No changes. This flow still matches the site."
-  const parts = [`${changes.length} change${changes.length === 1 ? "" : "s"} since this flow was taught`]
+  // "learned" covers both paths; "taught" would be wrong for a flow that was
+  // discovered by reading the page.
+  const parts = [`${changes.length} change${changes.length === 1 ? "" : "s"} since this flow was learned`]
   const auto = changes.filter((c) => c.autoHealable).length
   if (auto) parts.push(`${auto} heal${auto === 1 ? "s" : ""} automatically`)
   parts.push(

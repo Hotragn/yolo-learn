@@ -181,14 +181,70 @@ describe("structural edits beyond the scripted redesign", () => {
     expect(report.questions).toHaveLength(0)
   })
 
-  it("asks about a required field the demonstration left blank", () => {
+  it("asks about a required non-parameter field the demonstration left blank", () => {
+    // phone is not one of this flow's parameters, so nobody else will supply
+    // it: the human is the only one who can answer.
+    const flow = taughtOnV1({
+      fieldValues: { "service type": "checkup", date: "2026-09-11", time: "10:00 AM", "patient name": "Jane Doe" },
+    })
+    const report = detectDrift(flow, SITE_V1)
+    expect(report.changes).toHaveLength(0)
+    expect(report.questions.map((q) => q.purpose)).toEqual(["phone"])
+    expect(report.status).toBe("drifted")
+  })
+
+  it("does not ask about a required field the flow exposes as a parameter", () => {
+    // patient name IS a parameter here, so it belongs in the tool's input
+    // schema, not in a question to the user.
     const flow = taughtOnV1({
       fieldValues: { "service type": "checkup", date: "2026-09-11", time: "10:00 AM", phone: "555-0142" },
     })
     const report = detectDrift(flow, SITE_V1)
+    expect(report.questions).toHaveLength(0)
+    expect(report.status).toBe("healthy")
+  })
+})
+
+describe("a flow learned autonomously, with every field a parameter and no values", () => {
+  // This is exactly what discovery produces: the shape of the task, and
+  // nothing invented. It must come out clean rather than drowning the user in
+  // questions about values the caller is expected to pass.
+  function learnedOnV1(): TaughtFlow {
+    const fields = SITE_V1.steps.flatMap((s) => s.fields.map((f) => ({ step: s.intent, f })))
+    return {
+      ...taughtOnV1(),
+      id: "flow_auto",
+      name: "clinic_booking",
+      learnedBy: "autonomous",
+      fieldValues: {},
+      params: fields.map(({ step, f }) => ({
+        key: f.purpose.replace(/ (.)/g, (_m, c: string) => c.toUpperCase()),
+        label: f.label,
+        type: "string" as const,
+        sourceField: { stepIntent: step, fieldPurpose: f.purpose },
+      })),
+    }
+  }
+
+  it("has nothing to ask on the version it learned", () => {
+    const report = detectDrift(learnedOnV1(), SITE_V1)
     expect(report.changes).toHaveLength(0)
-    expect(report.questions.map((q) => q.purpose)).toEqual(["patient name"])
-    expect(report.status).toBe("drifted")
+    expect(report.questions).toHaveLength(0)
+    expect(report.status).toBe("healthy")
+  })
+
+  it("still asks exactly one question after the redesign", () => {
+    const report = detectDrift(learnedOnV1(), SITE_V2)
+    expect(report.changes).toHaveLength(4)
+    expect(report.questions.map((q) => q.purpose)).toEqual(["insurance id"])
+  })
+
+  it("heals to green with that one answer", () => {
+    const flow = learnedOnV1()
+    const q = detectDrift(flow, SITE_V2).questions[0]
+    const { flow: healed } = healFlow(flow, SITE_V2, { [q.id]: "INS-2211" })
+    expect(healed.status).toBe("healthy")
+    expect(detectDrift(healed, SITE_V2).questions).toHaveLength(0)
   })
 })
 
