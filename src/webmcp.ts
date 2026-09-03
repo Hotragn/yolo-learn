@@ -640,43 +640,6 @@ export async function registerStaticTools(): Promise<void> {
   })
 
   await registerTool({
-    name: "read_flow",
-    description:
-      "Read a task that spans several pages on a real site, starting from a URL. Walks the flow and reports each " +
-      "step: what it asks for, and where each field's purpose was read from. STRICTLY READ ONLY: GET requests only, " +
-      "nothing is ever submitted and no field is ever filled on the target site, so it cannot place an order or " +
-      "create an account. It follows a GET form's action or a next-looking link, never a POST, and stops at the " +
-      "origin it started on. Two real limits to pass on: no JavaScript from the target runs, so a client-rendered " +
-      "checkout will look empty, and many commerce sites refuse non-browser requests outright.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        url: { type: "string", description: "An http or https URL of a public page that starts the flow" },
-        maxSteps: { type: "number", description: "How many pages to read, up to 6" },
-      },
-      required: ["url"],
-    },
-    annotations: { readOnlyHint: true, untrustedContentHint: true },
-    execute: async (args, { signal }) => {
-      const bad = aborted(signal)
-      if (bad) return bad
-      const url = coerceValue(args.url).trim()
-      if (!url) return { error: "Pass the URL of the page that starts the flow." }
-      const maxSteps = Number(args.maxSteps)
-      const result = await readFlowAcrossPages(url, {
-        maxSteps: Number.isFinite(maxSteps) ? maxSteps : undefined,
-      })
-      return {
-        summary: result.ok
-          ? `Read ${result.steps.length} page(s) of a flow on ${result.origin}, ` +
-            `${result.steps.reduce((n, st) => n + st.fields.length, 0)} field(s) total. Nothing was submitted.`
-          : `Could not read a flow at ${url}: ${result.stoppedBecause}`,
-        ...result,
-      }
-    },
-  })
-
-  await registerTool({
     name: "recall_url",
     description:
       "Ask whether a real site's task is already known, WITHOUT fetching it. Call this before learn_url on any " +
