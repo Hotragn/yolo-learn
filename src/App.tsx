@@ -332,45 +332,6 @@ function Onboarding() {
         </div>
       </section>
 
-      <h2 data-tour="explainer">What you are looking at</h2>
-      <p className="sub">
-        This one page is deliberately two things, because a WebMCP tool belongs to the page that registers it. They
-        have to share an address.
-      </p>
-      <div className="explainer">
-        <div className="explain-card is-product">
-          <span className="explain-tag">The product</span>
-          <h3>{PRODUCT}</h3>
-          <p>
-            Reads a website's forms by itself, remembers the task by what each field is <em>for</em>, and hands your
-            AI agent a tool it can call. When the site changes, it says what changed and repairs itself.
-          </p>
-        </div>
-        <div className="explain-card">
-          <span className="explain-tag">Something to point it at</span>
-          <h3>
-            Northside Family Clinic <span className="fake-badge">not real</span>
-          </h3>
-          <p>
-            A pretend appointment-booking site, invented for this demo. There is no clinic, no booking is ever sent,
-            and nothing leaves your browser.
-          </p>
-          <p>
-            It exists so there is a website to learn. It also has a <b>version 2</b>, redesigned the way a real site
-            would be a year later, which is how you can watch the repair actually happen.
-          </p>
-        </div>
-      </div>
-      <p className="explain-note">
-        In short: press the button, watch it read the fake clinic, then switch the clinic to v2 and watch it survive.{" "}
-        Suspicious that we broke our own site on purpose? <a href="#/any">Paste in a real form</a> and watch the same
-        code read that instead.
-      </p>
-
-
-      <GuidedPanel />
-
-
       <h2 className="section-head">
         <IconRemember size={17} /> Two things it does
       </h2>
@@ -463,6 +424,45 @@ function Onboarding() {
           <a href="#/audit">the audit page</a>; the numbers are not baked in anywhere.
         </p>
       </div>
+
+      <h2 data-tour="explainer">What you are looking at</h2>
+      <p className="sub">
+        This one page is deliberately two things, because a WebMCP tool belongs to the page that registers it. They
+        have to share an address.
+      </p>
+      <div className="explainer">
+        <div className="explain-card is-product">
+          <span className="explain-tag">The product</span>
+          <h3>{PRODUCT}</h3>
+          <p>
+            Reads a website's forms by itself, remembers the task by what each field is <em>for</em>, and hands your
+            AI agent a tool it can call. When the site changes, it says what changed and repairs itself.
+          </p>
+        </div>
+        <div className="explain-card">
+          <span className="explain-tag">Something to point it at</span>
+          <h3>
+            Northside Family Clinic <span className="fake-badge">not real</span>
+          </h3>
+          <p>
+            A pretend appointment-booking site, invented for this demo. There is no clinic, no booking is ever sent,
+            and nothing leaves your browser.
+          </p>
+          <p>
+            It exists so there is a website to learn. It also has a <b>version 2</b>, redesigned the way a real site
+            would be a year later, which is how you can watch the repair actually happen.
+          </p>
+        </div>
+      </div>
+      <p className="explain-note">
+        In short: press the button, watch it read the fake clinic, then switch the clinic to v2 and watch it survive.{" "}
+        Suspicious that we broke our own site on purpose? <a href="#/any">Paste in a real form</a> and watch the same
+        code read that instead.
+      </p>
+
+
+      <GuidedPanel />
+
 
       <h2 className="section-head">
         <IconRead size={17} /> How it works
