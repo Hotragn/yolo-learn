@@ -52,6 +52,11 @@ Not claims. Numbers, each reproducible from the live site.
 | **A run interrupted by a page teardown** | Resumes at the step it reached, approval gate intact | Start a run, hard-reload mid-flight |
 | **Tests** | 239, including one that reproduces a real ChatGPT invocation crash | `npm test` |
 
+Every number above is worked through in **[VERIFICATION.md](VERIFICATION.md)**,
+including what is *not* verified. The ChatGPT session that found a real bug in
+this code is transcribed in
+**[docs/CHATGPT-SESSION.md](docs/CHATGPT-SESSION.md)**.
+
 ---
 
 ## The problem
