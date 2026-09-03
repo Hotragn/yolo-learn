@@ -326,6 +326,8 @@ the behaviour is specified above but not yet coded.
 over the same DOM. Not a model forming opinions: each one measures something a
 published rule defines, and cites it.
 
+<img src="docs/shot-audit.png" alt="Three lenses reporting on one page, each finding citing its rule" width="100%">
+
 | Lens | Asks | Grounded in |
 | --- | --- | --- |
 | Bug scout | names, ids, form owners, heading outline | WCAG SC 4.1.2, 1.1.1, 3.3.2, 1.3.1, HTML Living Standard |
