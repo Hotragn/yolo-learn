@@ -153,8 +153,43 @@ function rewriteCssUrls(css, sheetUrl) {
   })
 }
 
+/**
+ * A per-instance rate limit.
+ *
+ * Deliberately modest about what this is: serverless instances come and go and
+ * scale out, so this is a floor rather than a real limit. It stops one client
+ * hammering a single warm instance, and nothing more. Proper limiting needs
+ * shared state, which is one of the two honest arguments for adding a store.
+ */
+const RATE_WINDOW_MS = 60_000
+const RATE_MAX = 20
+const hits = new Map()
+
+function rateLimited(key) {
+  const now = Date.now()
+  const seen = (hits.get(key) ?? []).filter((t) => now - t < RATE_WINDOW_MS)
+  seen.push(now)
+  hits.set(key, seen)
+  // Keep the map from growing without bound on a long-lived instance.
+  if (hits.size > 5000) {
+    for (const [k, v] of hits) {
+      if (!v.some((t) => now - t < RATE_WINDOW_MS)) hits.delete(k)
+    }
+  }
+  return seen.length > RATE_MAX
+}
+
 export default async function handler(req, res) {
   res.setHeader("cache-control", "no-store")
+
+  const client =
+    (req.headers?.["x-forwarded-for"] ?? "").toString().split(",")[0].trim() || "unknown"
+  if (rateLimited(client)) {
+    res.status(429).json({
+      error: "Too many requests from this address in the last minute. Wait a moment and try again.",
+    })
+    return
+  }
 
   const target = (req.query?.url ?? "").toString().trim()
   if (!target) {

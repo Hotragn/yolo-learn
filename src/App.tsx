@@ -175,9 +175,6 @@ export default function App() {
             <a href="#/audit" aria-current={path === "/audit"} data-tour="nav-audit">
               Audit
             </a>
-            <a href="#/any" aria-current={path === "/any"} data-tour="nav-any">
-              Try your own
-            </a>
           </nav>
           <div className="head-right">
             <SiteVersionPill />
@@ -321,7 +318,7 @@ function Onboarding() {
         <h1>Teach an AI agent to use a website. Once.</h1>
         <p className="hero-lead">
           Agents cannot use websites they were not built for, and they break when a site changes.{" "}
-          <b>{PRODUCT}</b> reads the site itself and fixes itself.
+          <b>{PRODUCT}</b> reads a site itself, and audits it.
         </p>
         <div className="hero-actions">
           <a className="cta" href="#/site" data-tour="learn">
@@ -371,6 +368,100 @@ function Onboarding() {
 
 
       <GuidedPanel />
+
+
+      <h2 className="section-head">
+        <IconRemember size={17} /> Two things it does
+      </h2>
+      <p className="sub">
+        Both work on a page nobody here wrote. Neither needs an extension or an account.
+      </p>
+      <div className="explainer does">
+        <div className="explain-card">
+          <span className="explain-tag">One</span>
+          <h3>Learn a task, and survive the redesign</h3>
+          <p>
+            It reads a booking form by itself and mints a WebMCP tool your agent can call. A year later the site
+            renames a field, reorders the steps and adds a required one. It reports all four in plain English, asks
+            exactly one question, and runs green again.
+          </p>
+          <a className="cta small" href="#/site">
+            <IconRead size={16} /> Watch it learn the clinic
+          </a>
+        </div>
+        <div className="explain-card">
+          <span className="explain-tag">Two</span>
+          <h3>Audit any page, with three lenses</h3>
+          <p>
+            Paste a URL. Three specialist passes read the same DOM: structure and semantics, whether the task can
+            actually be completed, and measured contrast and target sizes. Every finding cites the rule it used, and
+            says whether that rule is a published standard or a preference of ours.
+          </p>
+          <a className="cta small" href="#/audit">
+            <IconRun size={16} /> Audit a real URL
+          </a>
+        </div>
+      </div>
+
+      <h2 className="section-head">
+        <IconCheck size={17} /> It agrees with W3C about W3C&apos;s own pages
+      </h2>
+      <p className="sub">
+        The W3C publishes a matched pair for its Before and After Demonstration: the same page, once built badly and
+        once built properly. Nobody here wrote either version, which is what makes it worth measuring against.
+      </p>
+      <div className="proof">
+        <table className="any-table">
+          <thead>
+            <tr>
+              <th>W3C page</th>
+              <th>Findings</th>
+              <th>High</th>
+              <th>Medium</th>
+              <th>Low</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <a href="https://www.w3.org/WAI/demos/bad/before/home.html" rel="noreferrer noopener">
+                  before
+                </a>{" "}
+                <small>deliberately inaccessible</small>
+              </td>
+              <td>
+                <b>44</b>
+              </td>
+              <td>8</td>
+              <td>33</td>
+              <td>3</td>
+            </tr>
+            <tr>
+              <td>
+                <a href="https://www.w3.org/WAI/demos/bad/after/home.html" rel="noreferrer noopener">
+                  after
+                </a>{" "}
+                <small>the accessible version</small>
+              </td>
+              <td>
+                <b>3</b>
+              </td>
+              <td>
+                <b>0</b>
+              </td>
+              <td>
+                <b>0</b>
+              </td>
+              <td>3</td>
+            </tr>
+          </tbody>
+        </table>
+        <p className="explain-note">
+          Forty-four down to three. High from eight to zero, medium from thirty-three to zero. The three that survive
+          on the fixed page are house-rule preferences, not standards. Run it yourself on{" "}
+          <a href="#/audit">the audit page</a>; the numbers are not baked in anywhere.
+        </p>
+      </div>
 
       <h2 className="section-head">
         <IconRead size={17} /> How it works

@@ -1395,3 +1395,25 @@ header nav a { white-space: nowrap; }
 @media (max-width: 620px) {
   .url-row { flex-direction: column; }
 }
+
+/* The two-things split and the W3C proof block. */
+.explainer.does .explain-card { display: flex; flex-direction: column; }
+.explainer.does .explain-card p { flex: 1; }
+.cta.small {
+  align-self: flex-start;
+  margin-top: 14px;
+  padding: 8px 14px;
+  font-size: 14px;
+}
+.proof {
+  border: 1px solid var(--accent-edge);
+  background: var(--accent-wash);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin-top: 4px;
+}
+.proof .any-table { margin-top: 0; }
+.proof .any-table th { border-bottom-color: var(--accent-edge); }
+.proof .any-table td { border-bottom-color: var(--accent-edge); }
+.proof .any-table td small { color: var(--ink-faint); }
+.proof .explain-note { margin-top: 12px; }

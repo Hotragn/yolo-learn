@@ -236,6 +236,10 @@ export function Audit() {
           </div>
         </label>
         <p className="explain-note">
+          Want to see where each field's <i>purpose</i> came from rather than what is wrong with it?{" "}
+          <a href="#/any">Read a form instead</a>.
+        </p>
+        <p className="explain-note">
           A serverless function fetches the page, because a browser is not allowed to read another origin. The three
           lenses still run here, in your browser, in a sandboxed frame with scripts disabled. Nothing from the target
           page executes, which also means a site that renders its content with JavaScript will look nearly empty. Only
