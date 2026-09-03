@@ -11,11 +11,41 @@ export interface FieldSpec {
   required?: boolean
 }
 
+/**
+ * Where a step lived when it was learned.
+ *
+ * A single-document wizard has one route for every step. A real checkout has
+ * one per page, and a run that spans them has to survive the navigations in
+ * between. Recording the route is what lets a resumed run know which step it
+ * is looking at, and what lets a moved page be reported as drift rather than
+ * as a mystery failure.
+ */
+export interface StepRoute {
+  /** location.pathname at the time the step was read. */
+  path: string
+  /** The hash route, for a single-document app. */
+  hash?: string
+}
+
+/**
+ * How much damage pressing this step's button does.
+ *
+ * One approval at the end is correct for a single document and wrong the
+ * moment a flow spans pages, because by then the earlier steps have already
+ * committed. The runner stops at every irreversible step instead.
+ *
+ * Classification is conservative: anything that does not clearly read as
+ * navigation is treated as irreversible.
+ */
+export type SideEffect = "none" | "reversible" | "irreversible"
+
 export interface StepSpec {
   order: number
   intent: string
   fields: FieldSpec[]
   submitLabel: string
+  route?: StepRoute
+  sideEffect?: SideEffect
 }
 
 export interface SiteModel {
@@ -33,16 +63,16 @@ export const SITE_V1: SiteModel = {
   steps: [
     { order: 1, intent: "choose service", fields: [
       { purpose: "service type", label: "Service", type: "select", options: SERVICE_OPTIONS, required: true },
-    ], submitLabel: "Next" },
+    ], submitLabel: "Next", sideEffect: "none" },
     { order: 2, intent: "pick date and time", fields: [
       { purpose: "date", label: "Preferred date", type: "date", required: true },
       { purpose: "time", label: "Preferred time", type: "select", options: TIME_OPTIONS, required: true },
-    ], submitLabel: "Next" },
+    ], submitLabel: "Next", sideEffect: "none" },
     { order: 3, intent: "enter patient details", fields: [
       { purpose: "patient name", label: "Your name", type: "text", required: true },
       { purpose: "phone", label: "Phone number", type: "tel", required: true },
-    ], submitLabel: "Next" },
-    { order: 4, intent: "confirm booking", fields: [], submitLabel: "Confirm booking" },
+    ], submitLabel: "Next", sideEffect: "none" },
+    { order: 4, intent: "confirm booking", fields: [], submitLabel: "Confirm booking", sideEffect: "irreversible" },
   ],
 }
 
@@ -58,16 +88,16 @@ export const SITE_V2: SiteModel = {
     { order: 1, intent: "pick date and time", fields: [
       { purpose: "date", label: "Preferred date", type: "date", required: true },
       { purpose: "time", label: "Preferred time", type: "select", options: TIME_OPTIONS, required: true },
-    ], submitLabel: "Next" },
+    ], submitLabel: "Next", sideEffect: "none" },
     { order: 2, intent: "choose service", fields: [
       { purpose: "service type", label: "Service", type: "select", options: SERVICE_OPTIONS, required: true },
-    ], submitLabel: "Next" },
+    ], submitLabel: "Next", sideEffect: "none" },
     { order: 3, intent: "enter patient details", fields: [
       { purpose: "patient name", label: "Full name (as on insurance card)", type: "text", required: true },
       { purpose: "phone", label: "Phone number", type: "tel", required: true },
       { purpose: "insurance id", label: "Insurance ID", type: "text", required: true },
-    ], submitLabel: "Next" },
-    { order: 4, intent: "confirm booking", fields: [], submitLabel: "Book appointment" },
+    ], submitLabel: "Next", sideEffect: "none" },
+    { order: 4, intent: "confirm booking", fields: [], submitLabel: "Book appointment", sideEffect: "irreversible" },
   ],
 }
 
@@ -183,6 +213,7 @@ export type ChangeType =
   | "WORDING"
   | "REMOVED_STEP"
   | "NEW_STEP"
+  | "ROUTE_CHANGED"
 
 export interface DriftChange {
   type: ChangeType
@@ -224,6 +255,23 @@ export function uniqueName(base: string, taken: string[]): string {
     if (!taken.includes(candidate)) return candidate
   }
   return `${slug}_${Date.now()}`
+}
+
+const NAVIGATION_LABEL = /^(next|continue|proceed|forwards?|onwards?|back|previous)\b/i
+const IRREVERSIBLE_LABEL =
+  /\b(pay|buy|purchase|order|checkout|book|confirm|submit|send|place|delete|remove|cancel|transfer|withdraw)\b/i
+
+/**
+ * Conservative by design. A label that clearly reads as navigation is safe;
+ * anything else is assumed to commit something, because being wrong in that
+ * direction only costs an extra confirmation.
+ */
+export function classifySideEffect(submitLabel: string): SideEffect {
+  const label = (submitLabel ?? "").trim()
+  if (!label) return "irreversible"
+  if (NAVIGATION_LABEL.test(label)) return "none"
+  if (IRREVERSIBLE_LABEL.test(label)) return "irreversible"
+  return "irreversible"
 }
 
 /** Form control name, used by the declarative WebMCP attributes. */

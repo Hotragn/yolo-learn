@@ -1,20 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { fieldName, FieldSpec, getActiveSiteModel, siteHash, slugify, syncSiteVersion } from "./types"
-import { valueForField } from "./drift"
-import { setRunExecutor, setSiteReset, RunResult } from "./runner"
+import {
+  ActiveRun,
+  finishRun,
+  PlanItem,
+  planFor,
+  resumableRun,
+  resumeRun,
+  RunResult,
+  saveRun,
+  setRunDriver,
+  setSiteReset,
+  sideEffectOf,
+} from "./runner"
 import { learnCurrentSite } from "./learn"
-import { logEvent, subscribe } from "./store"
+import { getFlow, logEvent, subscribe } from "./store"
 import { recallForPage } from "./recall"
 import { beginTeaching, useTeach } from "./TeachMode"
 import { Modal } from "./Modal"
-import { IconAlert, IconCheck, IconRead, IconRecord, IconTerminal, IconTrash } from "./icons"
-
-interface PlanItem {
-  stepIndex: number
-  purpose: string
-  label: string
-  value: string
-}
+import { IconAlert, IconCheck, IconRead, IconRecord, IconTerminal, IconTrash, IconUndo } from "./icons"
 
 interface ConfirmState {
   resolve: (ok: boolean) => void
@@ -54,12 +58,42 @@ export default function SiteApp() {
   const [highlight, setHighlight] = useState(false)
   const [filling, setFilling] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
+  const [resumed, setResumed] = useState(false)
   const [learning, setLearning] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
   // Mirrors `confirm` so unmount can settle a pending approval. Leaving the
   // page while the dialog is open would otherwise hang the agent's promise
   // forever, and a hung tool call is worse than a denied one.
   const pendingConfirm = useRef<ConfirmState | null>(null)
+  const localAbort = useRef<AbortController | null>(null)
+
+  /**
+   * Ask the human. Extracted because the gate now fires at every irreversible
+   * step rather than once at the end. An abort while the dialog is open
+   * resolves it as a denial instead of hanging whoever is waiting.
+   */
+  const askApproval = useCallback(
+    (plan: PlanItem[], submitLabel: string, signal: AbortSignal) =>
+      new Promise<boolean>((resolve) => {
+        let settled = false
+        const settle = (ok: boolean) => {
+          if (settled) return
+          settled = true
+          signal.removeEventListener("abort", onAbort)
+          pendingConfirm.current = null
+          setConfirm(null)
+          resolve(ok)
+        }
+        function onAbort() {
+          settle(false)
+        }
+        signal.addEventListener("abort", onAbort, { once: true })
+        const state: ConfirmState = { plan, submitLabel, resolve: settle }
+        pendingConfirm.current = state
+        setConfirm(state)
+      }),
+    []
+  )
 
   const resetWizard = useCallback(() => {
     setStepIndex(0)
@@ -106,58 +140,82 @@ export default function SiteApp() {
 
   const step = site.steps[Math.min(stepIndex, site.steps.length - 1)]
 
-  // The agent's run executor. It drives this same wizard on screen, so the
-  // human watches every keystroke and holds the only submit button.
-  useEffect(() => {
-    setRunExecutor(async (flow, params, signal): Promise<RunResult> => {
+  /**
+   * The run driver. One step at a time, persisting after each, so a document
+   * teardown cannot lose the run.
+   *
+   * The previous version was a single in-memory loop: correct for one
+   * document, and gone the moment the page reloaded. This version reads its
+   * position from the persisted run, which is what makes it resumable.
+   */
+  const drive = useCallback(
+    async (run: ActiveRun, signal: AbortSignal): Promise<RunResult> => {
       const model = getActiveSiteModel()
+      const flow = getFlow(run.flowId)
+      if (!flow) {
+        return finishRun(run, {
+          ok: false,
+          confirmedByHuman: false,
+          stepsExecuted: run.stepIndex,
+          message: `The "${run.toolName}" flow was deleted, so the run could not continue.`,
+        })
+      }
 
-      // Pre-flight the whole plan before touching the form. Bailing out
-      // half-filled would leave the wizard in a state the user has to undo.
-      const plan: PlanItem[] = []
-      for (let i = 0; i < model.steps.length; i++) {
-        for (const field of model.steps[i].fields) {
-          const value = valueForField(flow, params, field)
-          if (value == null || value === "") {
-            if (field.required) {
-              // Whose problem this is depends on whether the flow exposes the
-              // field as a parameter. Telling an agent to heal a flow when all
-              // it had to do was pass a value sends it down the wrong path.
-              const param = flow.params.find((p) => p.sourceField.fieldPurpose === field.purpose)
-              return {
-                ok: false,
-                confirmedByHuman: false,
-                stepsExecuted: 0,
-                needsHealing: !param,
-                message: param
-                  ? `The site requires "${field.label}". Call this tool again with the "${param.key}" parameter set.`
-                  : `The site requires "${field.label}" and this flow has no value for it. Heal the flow, then run it again.`,
-              }
-            }
-            continue
-          }
-          plan.push({ stepIndex: i, purpose: field.purpose, label: field.label, value })
-        }
+      const { items, blocked } = planFor(flow, run.params, model)
+      if (blocked) {
+        // Whose problem this is depends on whether the flow exposes the field
+        // as a parameter. Telling an agent to heal a flow when all it had to
+        // do was pass a value sends it down the wrong path.
+        return finishRun(run, {
+          ok: false,
+          confirmedByHuman: false,
+          stepsExecuted: 0,
+          needsHealing: !blocked.paramKey,
+          message: blocked.paramKey
+            ? `The site requires "${blocked.label}". Call this tool again with the "${blocked.paramKey}" parameter set.`
+            : `The site requires "${blocked.label}" and this flow has no value for it. Heal the flow, then run it again.`,
+        })
       }
 
       if (signal.aborted) {
-        return { ok: false, confirmedByHuman: false, stepsExecuted: 0, message: "Cancelled before the run started." }
+        return finishRun(run, {
+          ok: false,
+          confirmedByHuman: false,
+          stepsExecuted: 0,
+          message: "Cancelled before the run started.",
+        })
       }
 
       setRunning(true)
-      setValues({})
       setNotice(null)
-      setAgentNote("filling in your flow, step by step")
+      // Restore whatever a previous life already typed, rather than starting over.
+      setValues({ ...run.filled })
+      setResumed(run.resumeCount > 0)
+      setAgentNote(
+        run.resumeCount > 0
+          ? `picking up at step ${run.stepIndex + 1} after the page was torn down`
+          : "filling in your flow, step by step"
+      )
+
+      let current = run
+      const submitted = Object.fromEntries(items.map((p) => [p.label, p.value]))
 
       try {
-        for (let i = 0; i < model.steps.length; i++) {
+        for (let i = current.stepIndex; i < model.steps.length; i++) {
           if (signal.aborted) {
             resetWizard()
-            return { ok: false, confirmedByHuman: false, stepsExecuted: i, message: "Cancelled mid-run." }
+            return finishRun(current, {
+              ok: false,
+              confirmedByHuman: false,
+              stepsExecuted: i,
+              message: "Cancelled mid-run.",
+            })
           }
+
           setStepIndex(i)
           setHighlight(true)
-          for (const item of plan.filter((p) => p.stepIndex === i)) {
+          const stepItems = items.filter((p) => p.stepIndex === i)
+          for (const item of stepItems) {
             setFilling(item.purpose)
             setValues((prev) => ({ ...prev, [item.purpose]: item.value }))
             setAgentNote(`typing "${item.value}" into ${item.label}`)
@@ -165,85 +223,96 @@ export default function SiteApp() {
           }
           setFilling(null)
           if (!model.steps[i].fields.length) setAgentNote(`reviewing ${model.steps[i].intent}`)
+
+          // Checkpoint. If the document dies after this line, the run picks up
+          // from this step rather than from the beginning.
+          current = saveRun({
+            ...current,
+            stepIndex: i,
+            filled: { ...current.filled, ...Object.fromEntries(stepItems.map((p) => [p.purpose, p.value])) },
+            status: "running",
+            message: `at step ${i + 1} of ${model.steps.length}`,
+          })
+
           await wait(STEP_PAUSE, signal)
+
+          // The gate belongs at every irreversible step, not only at the end.
+          // Once a flow spans pages the earlier steps have already committed,
+          // so one approval at the finish would be approving the wrong thing.
+          if (sideEffectOf(model.steps[i]) === "irreversible") {
+            current = saveRun({
+              ...current,
+              status: "awaiting_approval",
+              message: `waiting for you to approve "${model.steps[i].submitLabel}"`,
+            })
+            setAgentNote(`waiting for you to approve "${model.steps[i].submitLabel}"`)
+
+            const approved = await askApproval(items, model.steps[i].submitLabel, signal)
+            if (!approved) {
+              resetWizard()
+              setNotice({
+                kind: "warn",
+                text: signal.aborted ? "Run cancelled. Nothing was submitted." : "You denied the submit. Nothing was sent.",
+              })
+              return finishRun(current, {
+                ok: false,
+                confirmedByHuman: false,
+                stepsExecuted: i + 1,
+                message: signal.aborted
+                  ? "Cancelled while waiting for approval. Nothing was submitted."
+                  : "The user denied the submit. Nothing was submitted.",
+                submitted,
+              })
+            }
+          }
+
           if (i < model.steps.length - 1) setHighlight(false)
-        }
-
-        if (signal.aborted) {
-          resetWizard()
-          return {
-            ok: false,
-            confirmedByHuman: false,
-            stepsExecuted: model.steps.length,
-            message: "Cancelled before asking for approval.",
-          }
-        }
-
-        const submitLabel = model.steps[model.steps.length - 1].submitLabel
-        setAgentNote("waiting for you to approve the submit")
-
-        // Human confirmation before every submit, always. An abort while the
-        // dialog is open resolves it as a denial instead of hanging the agent.
-        const approved = await new Promise<boolean>((resolve) => {
-          let settled = false
-          const settle = (ok: boolean) => {
-            if (settled) return
-            settled = true
-            signal.removeEventListener("abort", onAbort)
-            pendingConfirm.current = null
-            setConfirm(null)
-            resolve(ok)
-          }
-          function onAbort() {
-            settle(false)
-          }
-          signal.addEventListener("abort", onAbort, { once: true })
-          const state: ConfirmState = { plan, submitLabel, resolve: settle }
-          pendingConfirm.current = state
-          setConfirm(state)
-        })
-
-        const submitted = Object.fromEntries(plan.map((p) => [p.label, p.value]))
-
-        if (!approved) {
-          resetWizard()
-          setNotice({ kind: "warn", text: signal.aborted ? "Run cancelled. Nothing was submitted." : "You denied the submit. Nothing was sent." })
-          return {
-            ok: false,
-            confirmedByHuman: false,
-            stepsExecuted: model.steps.length,
-            message: signal.aborted
-              ? "Cancelled while waiting for approval. Nothing was submitted."
-              : "The user denied the submit. Nothing was submitted.",
-            submitted,
-          }
         }
 
         const reference = bookingRef()
         resetWizard()
         setNotice({ kind: "ok", text: `Booked. Confirmation ${reference}` })
-        return {
+        return finishRun(current, {
           ok: true,
           confirmedByHuman: true,
           stepsExecuted: model.steps.length,
           message: `Booking confirmed, reference ${reference}`,
           submitted,
           reference,
-        }
+        })
       } finally {
         setRunning(false)
         setAgentNote(null)
         setHighlight(false)
         setFilling(null)
       }
-    })
+    },
+    [resetWizard, askApproval]
+  )
+
+  useEffect(() => {
+    setRunDriver(drive)
     return () => {
-      setRunExecutor(null)
-      // Navigating away from the demo site mid-run counts as a denial:
-      // nothing was submitted and the agent gets an answer, not a hang.
+      setRunDriver(null)
+      // Leaving the demo site inside the app is a denial: the JS context
+      // survives, so somebody is still waiting on an answer. A page teardown
+      // is different, and deliberately leaves the run resumable, because
+      // React never gets to run this cleanup in that case.
       pendingConfirm.current?.resolve(false)
     }
-  }, [resetWizard])
+  }, [drive])
+
+  // Pick up a run that a page teardown interrupted. Nobody is awaiting this
+  // one by definition, so the outcome goes to the flow's history instead.
+  useEffect(() => {
+    const pending = resumableRun()
+    if (!pending) return
+    const controller = new AbortController()
+    localAbort.current = controller
+    void resumeRun(controller.signal)
+    return () => controller.abort()
+  }, [])
+
 
   // The declarative WebMCP form fires these when an agent pre-fills or
   // abandons it, which is worth showing in the audit trail.
@@ -346,6 +415,15 @@ export default function SiteApp() {
         <div className="teach-badge" role="status">
           <IconRecord className="rec" size={16} />
           <span>Recording your demonstration. {teachHint}</span>
+        </div>
+      )}
+      {resumed && (
+        <div className="resumed" role="status">
+          <IconUndo size={16} />
+          <span>
+            <b>This run survived a page teardown.</b> Its state was stored outside the document, so it picked up at
+            the step it had reached instead of starting again.
+          </span>
         </div>
       )}
       {agentNote && (

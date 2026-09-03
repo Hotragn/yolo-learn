@@ -126,6 +126,19 @@ export function detectDrift(flow: TaughtFlow, current: SiteModel): DriftReport {
         autoHealable: true,
       })
     }
+
+    // A step that moved to a different URL. Auto-healable, because the new
+    // route is right there on the page: the flow just has to be told.
+    const was = taughtStep.route
+    const now = curStep.route
+    if (was && now && (was.path !== now.path || was.hash !== now.hash)) {
+      changes.push({
+        type: "ROUTE_CHANGED",
+        description:
+          `Step "${curStep.intent}" moved from ${was.hash ?? was.path} to ${now.hash ?? now.path}`,
+        autoHealable: true,
+      })
+    }
   }
 
   for (const taughtStep of flow.steps) {

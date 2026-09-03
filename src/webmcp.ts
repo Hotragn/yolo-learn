@@ -36,7 +36,7 @@
 import { coerceValue, getActiveSiteModel, TaughtFlow } from "./types"
 import { getFlow, loadFlows, logEvent, patchFlow } from "./store"
 import { detectDrift, effectiveStatus, healFlow, storedValue } from "./drift"
-import { normalizeParams, runFlowInteractive } from "./runner"
+import { loadRun, normalizeParams, runFlowInteractive } from "./runner"
 import { beginTeaching } from "./TeachMode"
 
 export interface ToolAnnotations {
@@ -285,18 +285,6 @@ function driftGuard(flow: TaughtFlow) {
   return report
 }
 
-function recordRun(flowId: string, ok: boolean, message: string) {
-  const flow = getFlow(flowId)
-  if (!flow) return // deleted mid-run; nothing to record
-  const runs = [{ at: new Date().toISOString(), ok, message }, ...(flow.runs ?? [])].slice(0, 3)
-  patchFlow(flowId, {
-    runs,
-    runCount: ok ? flow.runCount + 1 : flow.runCount,
-    lastRunAt: new Date().toISOString(),
-    status: ok ? "healthy" : flow.status,
-  })
-}
-
 // --- static tools --------------------------------------------------------
 
 let staticRegistered = false
@@ -406,13 +394,6 @@ export async function registerStaticTools(): Promise<void> {
       if (errors.length) return { error: errors.join(" "), summary: "Nothing was submitted." }
 
       const result = await runFlowInteractive(flow, params, signal)
-      recordRun(flow.id, result.ok, result.message)
-      if (result.ok) {
-        logEvent("run", `Ran ${flow.name}: ${result.message}`)
-        logEvent("confirm", `Human approved the submit for ${flow.name}`)
-      } else {
-        logEvent("run", `${flow.name} did not complete: ${result.message}`)
-      }
       return {
         summary: result.message,
         ...result,
@@ -467,6 +448,46 @@ export async function registerStaticTools(): Promise<void> {
         flow: flowSummary(healed),
         appliedAnswersFor: applied,
         remainingQuestions,
+      }
+    },
+  })
+
+  await registerTool({
+    name: "get_run_status",
+    description:
+      "Report the run in progress, or the last one that finished, in this tab. Call this when a run_flow call " +
+      "never returned: a page navigation or a reload destroys the promise you were waiting on, but not the run " +
+      "itself. It picks up where it stopped and the outcome lands here and in the flow's history. Also tells you " +
+      "whether it is currently waiting on the human at an approval gate.",
+    inputSchema: { type: "object", properties: {} },
+    annotations: { readOnlyHint: true, untrustedContentHint: true },
+    execute: async (_args, { signal }) => {
+      const bad = aborted(signal)
+      if (bad) return bad
+      const run = loadRun()
+      if (!run) {
+        return { summary: "No run in this tab.", status: "none" }
+      }
+      const flow = getFlow(run.flowId)
+      return {
+        summary:
+          run.status === "awaiting_approval"
+            ? `${run.toolName} is waiting for the human to approve the submit.`
+            : run.status === "running"
+              ? `${run.toolName} is at step ${run.stepIndex + 1}.`
+              : `${run.toolName} finished: ${run.message}`,
+        runId: run.runId,
+        status: run.status,
+        tool: run.toolName,
+        flowStillExists: !!flow,
+        step: run.stepIndex + 1,
+        of: flow?.steps.length ?? null,
+        message: run.message,
+        reference: run.reference,
+        needsHealing: run.needsHealing,
+        // How many times a page teardown interrupted it and it carried on.
+        resumedAfterTeardown: run.resumeCount,
+        startedAt: run.startedAt,
       }
     },
   })
@@ -664,13 +685,6 @@ export async function mintFlowTool(
         if (errors.length) return { error: errors.join(" "), summary: "Nothing was submitted." }
 
         const result = await runFlowInteractive(fresh, params, signal)
-        recordRun(flowId, result.ok, result.message)
-        if (result.ok) {
-          logEvent("run", `Agent ran ${fresh.name} via its minted tool: ${result.message}`)
-          logEvent("confirm", `Human approved the submit for ${fresh.name}`)
-        } else {
-          logEvent("run", `${fresh.name} did not complete: ${result.message}`)
-        }
         return {
           summary: result.message,
           ...result,

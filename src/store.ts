@@ -116,6 +116,23 @@ export function restoreFlow(deleted: DeletedFlow) {
   saveFlows(flows)
 }
 
+/**
+ * sessionStorage, with a no-op stand-in when it throws.
+ *
+ * Run state belongs here rather than in localStorage: a run belongs to one tab
+ * and should not outlive it, and two tabs must not fight over the same run.
+ */
+export function safeSession(): Pick<Storage, "getItem" | "setItem" | "removeItem"> {
+  try {
+    const probe = "__probe__"
+    sessionStorage.setItem(probe, "1")
+    sessionStorage.removeItem(probe)
+    return sessionStorage
+  } catch {
+    return { getItem: () => null, setItem: () => {}, removeItem: () => {} }
+  }
+}
+
 export function logEvent(type: AuditEvent["type"], detail: string) {
   const events = getAudit()
   events.unshift({ at: new Date().toISOString(), type, detail })

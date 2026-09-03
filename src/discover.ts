@@ -1,4 +1,4 @@
-import { FieldSpec, FieldType, slugify, StepSpec } from "./types"
+import { classifySideEffect, FieldSpec, FieldType, slugify, StepSpec } from "./types"
 
 /**
  * Autonomous flow discovery.
@@ -308,7 +308,15 @@ export async function discoverFlow(options: DiscoverOptions = {}): Promise<Disco
     }
 
     progress(`reading step ${index + 1}: ${intent}`)
-    steps.push({ order: index + 1, intent, fields: fields.map((f) => ({ ...f })), submitLabel })
+    steps.push({
+      order: index + 1,
+      intent,
+      fields: fields.map((f) => ({ ...f })),
+      submitLabel,
+      // Where this step lived, and how much pressing its button commits.
+      route: { path: location.pathname, hash: location.hash.split("?")[0] || undefined },
+      sideEffect: classifySideEffect(submitLabel),
+    })
 
     // Decide whether there is a next step, and whether it is safe to ask for
     // it. A counter is proof; otherwise only an explicit "next" will do.
