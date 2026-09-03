@@ -24,6 +24,14 @@
 //      of the tool descriptor and are set honestly below.
 //   7. Tool changes propagate through the `toolchange` event, so the Tools view
 //      listens instead of polling.
+//   8. Access is gated by the "tools" policy-controlled feature, whose default
+//      allowlist is 'self'. A third rejection reason therefore exists alongside
+//      InvalidStateError and SecurityError: NotAllowedError, when the document
+//      is not allowed to use "tools". Top-level same-origin satisfies the
+//      default, but an embedded build would need <iframe allow="tools">.
+//      Notably the spec does NOT mandate a user-facing consent prompt: gating
+//      is by permissions policy, not by a dialog. The approval step in this app
+//      is our own, deliberately, because the spec does not provide one.
 
 import { coerceValue, getActiveSiteModel, TaughtFlow } from "./types"
 import { getFlow, loadFlows, logEvent, patchFlow } from "./store"
@@ -175,6 +183,9 @@ export async function registerTool(
       native = true
       attachNativeChangeHook()
     } catch (err) {
+      // Three known rejections, all worth reporting verbatim rather than
+      // swallowing: InvalidStateError (name taken), SecurityError (document
+      // not origin-keyed), NotAllowedError ("tools" not permitted here).
       error = err instanceof Error ? `${err.name}: ${err.message}` : String(err)
       lastError = error
     }

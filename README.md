@@ -321,7 +321,7 @@ faith.
 ### WebMCP notes worth knowing
 
 Verified against the [spec](https://webmachinelearning.github.io/webmcp/) and
-[Chrome's docs](https://developer.chrome.com/docs/ai/webmcp). Four things bite:
+[Chrome's docs](https://developer.chrome.com/docs/ai/webmcp). Five things bite:
 
 - The entry point is `document.modelContext`. An earlier revision of the proposal
   used `navigator.modelContext`, so both are feature-detected.
@@ -333,6 +333,12 @@ Verified against the [spec](https://webmachinelearning.github.io/webmcp/) and
   `Origin-Agent-Cluster: ?1` (`vite.config.ts` for dev, `vercel.json` for
   production). Without that header, registration fails with `SecurityError`. The
   banner at the top of the app tells you if that ever happens.
+- **Access is gated by permissions policy, not by a consent prompt.** The
+  `tools` policy-controlled feature defaults to `self`, and a document that is
+  not allowed to use it gets `NotAllowedError`. Top-level same-origin satisfies
+  the default; an embedded build would need `<iframe allow="tools">`. The spec
+  does **not** mandate a user-facing permission dialog, which is precisely why
+  the approval step in this app is our own.
 
 Declarative attributes used on the booking form: `toolname`, `tooldescription`,
 `toolparamdescription`. `toolautosubmit` is deliberately **not** used, because
