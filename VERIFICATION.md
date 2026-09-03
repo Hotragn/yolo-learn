@@ -3,7 +3,7 @@
 **Live:** https://yolo-learn.vercel.app
 **Repo:** https://github.com/Hotragn/yolo-learn (public, MIT)
 
-`npm test` (106 tests), `npm run typecheck`, `npm run build` - all green. Browser
+`npm test` (117 tests), `npm run typecheck`, `npm run build` - all green. Browser
 QA driven through a headless Chromium against the dev server, the local
 production build (`vite preview`), and the live Vercel deployment.
 
@@ -255,6 +255,36 @@ navigation happens in it. A full reload is a strictly harsher teardown than a
 navigation, which is why that is what was tested, but "works on a real
 checkout" remains unproven.
 
+## 6c. Reading markup this app did not write
+
+The closed loop was the standing criticism: we author the clinic, we author its
+v2, so surviving it proves less than it looks. `readFormFromHTML` runs the live
+field-reading path against arbitrary markup, and the page reports where every
+purpose came from so the reading can be checked by eye rather than trusted.
+
+Verified on live production against three samples built to be structurally
+unlike the clinic:
+
+| Sample | Result |
+| --- | --- |
+| Parking permit (no `for`/`id` wiring, purposes only in `name`) | 4 fields read, all from `name=`, honeypot skipped |
+| School lunch (purposes only in `autocomplete` tokens) | 5 fields read from `autocomplete=`, password refused |
+| Supplier reorder (`aria-label` only, disabled field, card number) | 4 fields read, disabled skipped, `cc-number` refused |
+
+**It immediately found two live-path bugs**, which is the strongest argument for
+having built it:
+
+| Bug | Cause | Fix |
+| --- | --- | --- |
+| `display:none` honeypot read as a real field | `isVisible` relied on `getComputedStyle`; a parsed document has no view to compute in, so the check silently passed | Read the `style` attribute too, and skip `type=hidden` |
+| Wrapping `<label>` swallowed its control's text (`Year group Choose Year 3Year 4Year 5`) | Fell back to `label.textContent`, which includes `<option>` text. Our clinic uses a `<span>`, so it never surfaced | Clone the label and strip controls before reading text |
+
+11 new tests cover both, plus junk input, fragments with no `<form>`, and a form
+that is nothing but credentials.
+
+Not claimed: it cannot walk a wizard from markup alone, and it cannot register a
+tool on another origin's document. Both are stated on the page.
+
 ## 7. Limitations - what is NOT verified
 
 - **The ChatGPT desktop in-app browser.** Not tested. Native registration is
@@ -264,6 +294,7 @@ checkout" remains unproven.
 - **A real multi-document flow.** The resumable runner is built and tested
   against a document teardown, but the demo site is a single document, so
   nothing here has crossed a real page navigation.
+- **Crawling a live third-party URL.** Reading pasted markup is verified; fetching and walking somebody else's site from this page is not possible same-origin and is not attempted.
 - **Discovery against arbitrary real-world sites.** It is unit-tested against
   fixtures with markup the demo site does not use (labels by `for`/`id`,
   `autocomplete` with no `name`, no headings, hidden and disabled controls,

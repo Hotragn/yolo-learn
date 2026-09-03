@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://yolo-learn.vercel.app"><img src="https://img.shields.io/badge/live%20demo-yolo--learn.vercel.app-7BD40A?style=flat-square&labelColor=0B1220" alt="Live demo"></a>
-  <img src="https://img.shields.io/badge/tests-106%20passing-7BD40A?style=flat-square&labelColor=0B1220" alt="106 tests passing">
+  <img src="https://img.shields.io/badge/tests-117%20passing-7BD40A?style=flat-square&labelColor=0B1220" alt="117 tests passing">
   <img src="https://img.shields.io/badge/Chrome%20149-7%2F7%20tools%20registered-7BD40A?style=flat-square&labelColor=0B1220" alt="Verified on Chrome 149">
   <img src="https://img.shields.io/badge/dependencies-react%20only-0B1220?style=flat-square" alt="React only">
   <img src="https://img.shields.io/badge/license-MIT-0B1220?style=flat-square" alt="MIT license">
@@ -320,6 +320,47 @@ the behaviour is specified above but not yet coded.
 
 ---
 
+## "You broke your own site on purpose"
+
+Fair. The clinic is ours and so is its redesign, so of course it survives. The
+field reading is the part actually under question, so it is exposed against
+markup this app has never seen: **[Try your own](https://yolo-learn.vercel.app/#/any)**.
+
+<img src="docs/shot-anyform.png" alt="Reading a pasted parking-permit form, with a table showing where each purpose came from" width="100%">
+
+Paste any real form's HTML and the same code reads it, then shows where every
+purpose came from:
+
+```
+po ref          <- name="po_ref"
+sku             <- name="sku"
+quantity        <- name="quantity"
+delivery speed  <- name="delivery_speed"
+Refused 1 field: Card number
+```
+
+Purposes come from the attributes a server reads, never from label text or a
+CSS selector, because those are exactly what a visual refresh rewrites.
+
+**It found two real bugs the moment it saw foreign markup**, and both were in
+the live path, not just the new one:
+
+- A `display:none` honeypot was read as a genuine field. `isVisible` leaned on
+  `getComputedStyle`, and a parsed document has no view to compute in, so the
+  check silently passed.
+- A wrapping `<label>` swallowed its control's text, so `Year group` came out as
+  `Year group Choose Year 3Year 4Year 5`. Our clinic puts label text in a
+  `<span>`, which is precisely why this never surfaced.
+
+That is the argument for the feature in miniature: reading only our own markup
+was hiding defects.
+
+**What it does not prove.** It cannot walk a wizard from markup alone, because
+that needs the site's own JavaScript. It cannot register a tool on somebody
+else's page either: a WebMCP tool belongs to the document that registers it, so
+reaching real sites needs a browser extension. Both limits are stated on the
+page itself.
+
 ## Run it
 
 ```
@@ -335,12 +376,13 @@ npm run dev
 | `#/site?v=2` | The same clinic, one year later |
 | `#/site?teach=1` | Teach mode, when you want your own values remembered |
 | `#/tools` | The live WebMCP registry |
+| `#/any` | Read a form this app did not write |
 | `#/?demo=learned` | Seeded: just read off the page |
 | `#/?demo=drifted` | Seeded: drift ready to read |
 | `#/?demo=healed` | Seeded: healed and matching |
 
 ```
-npm test          # 106 unit tests
+npm test          # 117 unit tests
 npm run typecheck
 npm run build
 ```
