@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { KNOWN_RULE_IDS, KNOWN_RULE_SET } from "../../api/_rules.js"
 import { RULES } from "../audit/lenses"
-import { splitAuditKey } from "../audit/run"
-import { auditKey } from "../audit/run"
+import { auditDocument, auditHTML, auditKey, splitAuditKey } from "../audit/run"
 
 describe("the shared-memory allow-list cannot drift from the real rules", () => {
   // api/_rules.js is plain JS because it runs in a serverless function, and
@@ -89,5 +88,39 @@ describe("the audit key describes the audited page, not the caller's", () => {
     expect(parts).not.toBeNull()
     expect(parts!.origin).toBe("https://www.w3.org")
     expect(parts!.fingerprint).toMatch(/^[a-z0-9]{1,16}$/)
+  })
+})
+
+describe("a page that never renders must not read as clean", () => {
+  it("flags a render failure instead of reporting zero findings", async () => {
+    // The bug: a blind 1200ms timeout raced the iframe load, so a slow page
+    // was measured before its body existed. Zero findings then looked exactly
+    // like a clean page, which is the one thing this project refuses to do.
+    const out = await auditHTML("", { label: "https://empty.example", remember: false })
+    expect(out.renderFailed).toBe(true)
+    expect(out.totals.findings).toBe(0)
+    // The notes have to say so loudly, because the number alone is misleading.
+    expect(out.notes.join(" ")).toMatch(/RENDER FAILED/)
+    expect(out.notes.join(" ")).toMatch(/not a clean result/i)
+  })
+
+  it("does not publish shared memory for a page it could not render", async () => {
+    const out = await auditHTML("", { label: "https://empty.example", remember: false })
+    // No key means splitAuditKey refuses it, so nothing reaches the endpoint.
+    expect(splitAuditKey(out.key)).toBeNull()
+  })
+
+  // The happy path cannot be asserted here: jsdom does not render srcdoc, so
+  // the frame's body stays empty and every auditHTML call looks like a render
+  // failure. That is also why this path went untested long enough for the
+  // 1200ms race to survive - nothing in the suite touched auditHTML at all.
+  // It is verified in a real browser against the live deployment instead, and
+  // the result is recorded in VERIFICATION.md.
+  it("measures a document it is handed directly, which is testable here", () => {
+    document.body.innerHTML = `<main><form><input name="permit_ref" required><button>Pay now</button></form></main>`
+    const out = auditDocument(document, { label: "https://real.example", remember: false })
+    expect(out.renderFailed).toBeUndefined()
+    expect(splitAuditKey(out.key)).not.toBeNull()
+    expect(out.totals.checked).toBeGreaterThan(0)
   })
 })

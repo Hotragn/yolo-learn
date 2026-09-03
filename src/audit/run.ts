@@ -19,6 +19,14 @@ import { Finding, Lens, LensReport, runLenses } from "./lenses"
  * checkable rather than asserted.
  */
 
+// Ceiling for the load event on a real page with inlined CSS and remote
+// images. The old code waited a flat 1200ms and did not wait for load at all.
+const RENDER_LOAD_CEILING_MS = 6000
+// After load, only enough slack to catch a DOM that has not flushed yet.
+// Waiting the full ceiling again would make an empty page take twelve seconds
+// to report that it is empty.
+const RENDER_SETTLE_MS = 800
+
 export interface AuditResult {
   reports: LensReport[]
   totals: { findings: number; unknowns: number; checked: number; corroborated: number }
@@ -33,6 +41,8 @@ export interface AuditResult {
    * which the caller does not have a handle on.
    */
   key: string
+  /** True when the page never rendered, so no lens ran. Never means "clean". */
+  renderFailed?: boolean
 }
 
 export interface AuditDiff {
@@ -171,18 +181,38 @@ export async function auditHTML(html: string, options: RunOptions = {}): Promise
     "position:fixed;left:-10000px;top:0;width:1280px;height:900px;border:0;visibility:hidden;"
   frame.srcdoc = html
 
-  const ready = new Promise<void>((resolve) => {
+  // A blind 1200ms timeout used to race the load event here, and on a real
+  // page with inlined stylesheets and remote images the timeout usually won.
+  // The frame was then measured before its body existed, which produced an
+  // audit with zero findings: indistinguishable from a clean page. So wait for
+  // the load event, then poll until there is actually something to measure.
+  const loaded = new Promise<void>((resolve) => {
     frame.addEventListener("load", () => resolve(), { once: true })
-    // srcdoc on a detached frame can settle before the listener attaches.
-    setTimeout(resolve, 1200)
+    setTimeout(resolve, RENDER_LOAD_CEILING_MS)
   })
 
   document.body.appendChild(frame)
   try {
-    await ready
+    await loaded
+    const deadline = Date.now() + RENDER_SETTLE_MS
+    while (Date.now() < deadline) {
+      const body = frame.contentDocument?.body
+      if (body && body.childElementCount > 0) break
+      await new Promise((r) => setTimeout(r, 60))
+    }
+
     const doc = frame.contentDocument
-    if (!doc || !doc.body) {
-      return summarise([], ["The pasted markup could not be rendered, so nothing was measured."])
+    if (!doc || !doc.body || doc.body.childElementCount === 0) {
+      // Loud, not quiet. Reporting zero findings for a page that never
+      // rendered would be the exact failure this project refuses elsewhere:
+      // something uncomputable presented as something that passed.
+      return {
+        ...summarise([], [
+          "RENDER FAILED. The markup never produced a document, so NOTHING was measured.",
+          "This is not a clean result. Zero findings here means zero checks ran, not zero problems.",
+        ]),
+        renderFailed: true,
+      }
     }
     const lenses = options.lenses ?? ["bugs", "workflow", "theme"]
     const reports = runLenses(doc, lenses)
