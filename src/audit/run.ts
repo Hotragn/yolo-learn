@@ -26,6 +26,13 @@ export interface AuditResult {
   /** Present from the second audit of the same page onwards. */
   diff?: AuditDiff
   notes: string[]
+  /**
+   * Identifies the page that was audited: label plus a fingerprint of its
+   * structure. Returned rather than left internal because callers need it and
+   * cannot rederive it: doing so means fingerprinting the audited document,
+   * which the caller does not have a handle on.
+   */
+  key: string
 }
 
 export interface AuditDiff {
@@ -94,7 +101,7 @@ export function auditKey(doc: Document, label: string): string {
   return `${label}#${(hash >>> 0).toString(36)}`
 }
 
-function summarise(reports: LensReport[], notes: string[], diff?: AuditDiff): AuditResult {
+function summarise(reports: LensReport[], notes: string[], diff?: AuditDiff, key = ""): AuditResult {
   const findings = reports.flatMap((r) => r.findings)
   return {
     reports,
@@ -111,6 +118,7 @@ function summarise(reports: LensReport[], notes: string[], diff?: AuditDiff): Au
     },
     diff,
     notes: [...notes, ...reports.flatMap((r) => r.notes)],
+    key,
   }
 }
 
@@ -142,7 +150,7 @@ export function auditDocument(doc: Document, options: RunOptions = {}): AuditRes
   const key = auditKey(doc, label)
   const diff = diffAgainst(recallAudit(key), findings)
   if (options.remember !== false) rememberAudit(key, findings)
-  return summarise(reports, [], diff)
+  return summarise(reports, [], diff, key)
 }
 
 /**
@@ -187,7 +195,7 @@ export async function auditHTML(html: string, options: RunOptions = {}): Promise
     return summarise(reports, [
       "Rendered in a sandboxed frame with scripts disabled, so layout and the cascade are real and the pasted page's own JavaScript never ran.",
       "Inline styles and <style> blocks apply. A stylesheet linked by a relative URL will not resolve, so some colours may differ from the real site.",
-    ], diff)
+    ], diff, key)
   } finally {
     frame.remove()
   }
@@ -246,6 +254,7 @@ export async function auditUrl(url: string, options: RunOptions = {}): Promise<A
   return {
     ...result,
     page,
+    key: result.key,
     notes: [
       `Fetched ${page.finalUrl}${page.redirected ? " (after a redirect)" : ""}, ${Math.round((page.bytes ?? 0) / 1024)}KB.`,
       ...(page.notes ?? []),

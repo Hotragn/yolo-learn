@@ -4,7 +4,6 @@ import {
   auditDocument,
   auditHTML,
   AuditResult,
-  auditKey,
   auditUrl,
   contributeSharedMemory,
   forgetAudits,
@@ -188,11 +187,10 @@ export function Audit() {
       const out = await auditUrl(url.trim())
       logEvent("learn", `Audited ${url.trim()}: ${out.totals.findings} finding(s)`)
 
-      // Shared memory is a hint about a page shape, so it only makes sense for
-      // a real origin. splitAuditKey refuses anything else.
-      const parts = out.page?.finalUrl
-        ? splitAuditKey(auditKey(document, new URL(out.page.finalUrl).origin))
-        : null
+      // Use the key the audit itself produced. Rederiving it here fingerprinted
+      // THIS page's DOM rather than the audited one, which collapsed every
+      // audited URL onto a single fingerprint.
+      const parts = splitAuditKey(out.key)
       if (parts) {
         const before = await readSharedMemory(parts.origin, parts.fingerprint)
         setShared(before)

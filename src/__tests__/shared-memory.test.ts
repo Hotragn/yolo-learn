@@ -56,3 +56,38 @@ describe("splitting an audit key for the endpoint", () => {
     expect(splitAuditKey("http://localhost:5173#abc")?.origin).toBe("http://localhost:5173")
   })
 })
+
+describe("the audit key describes the audited page, not the caller's", () => {
+  // The bug this guards against: the Audit view rederived the key by calling
+  // auditKey(document, origin), which fingerprints the Yolo Learn page's own
+  // DOM. Every audited URL on one origin then collapsed onto a single
+  // fingerprint, and the fingerprint never changed when the target did.
+  function keyFor(html: string, label: string): string {
+    document.body.innerHTML = html
+    return auditKey(document, label)
+  }
+
+  it("changes when the audited markup changes", () => {
+    const a = keyFor(`<form><input name="one"><button>Next</button></form>`, "https://example.com")
+    const b = keyFor(`<form><input name="one"><input name="two"><button>Next</button></form>`, "https://example.com")
+    expect(a).not.toBe(b)
+  })
+
+  it("is stable for the same markup", () => {
+    const html = `<form><input name="one"><button>Next</button></form>`
+    expect(keyFor(html, "https://example.com")).toBe(keyFor(html, "https://example.com"))
+  })
+
+  it("separates two origins with identical markup", () => {
+    const html = `<form><input name="one"><button>Next</button></form>`
+    expect(keyFor(html, "https://a.example")).not.toBe(keyFor(html, "https://b.example"))
+  })
+
+  it("survives the round trip the endpoint requires", () => {
+    const key = keyFor(`<form><input name="q"><button>Next</button></form>`, "https://www.w3.org")
+    const parts = splitAuditKey(key)
+    expect(parts).not.toBeNull()
+    expect(parts!.origin).toBe("https://www.w3.org")
+    expect(parts!.fingerprint).toMatch(/^[a-z0-9]{1,16}$/)
+  })
+})
