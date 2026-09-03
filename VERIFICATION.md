@@ -3,7 +3,7 @@
 **Live:** https://yolo-learn.vercel.app
 **Repo:** https://github.com/Hotragn/yolo-learn (public, MIT)
 
-`npm test` (175 tests), `npm run typecheck`, `npm run build` - all green. Browser
+`npm test` (188 tests), `npm run typecheck`, `npm run build` - all green. Browser
 QA driven through a headless Chromium against the dev server, the local
 production build (`vite preview`), and the live Vercel deployment.
 
@@ -357,6 +357,60 @@ in the browser.
 **Not verified:** behaviour against pages requiring authentication, and against
 sites that render their content client-side. The second is a known limitation
 rather than an untested one, and is reported in the result.
+
+## 6d. Shared memory, and the two bugs finding it exposed
+
+An Upstash Redis instance is linked to the project. Vercel injects
+`KV_REST_API_URL` and `KV_REST_API_TOKEN`, which is what `api/_kv.js` reads
+first, so no code changed to enable it.
+
+**Verified end to end on production**, with browser-local memory deliberately
+wiped so the shared store was the only possible source:
+
+> This page shape has been audited 1 time before, most recently 03/09/2026,
+> 05:34:53. Commonly trips: wcag-4.1.2 (1), wcag-1.1.1 (1), html-form-owner (1),
+> yolo-tiny-text (1). A hint only: the lenses above re-ran from scratch.
+
+| Property | How it was verified |
+| --- | --- |
+| The store is reachable | `/api/memory` returns `configured: true` |
+| A write is aggregated | `audits` incremented 1 to 2, per-rule counts followed |
+| Hostile rule ids are dropped | Posted `<script>alert(1)</script>`, `wcag-1.4.3-but-evil`, `../../etc/passwd`, `""`, `null`, `42`, `{}`. Stored: only `wcag-1.4.3` and `wcag-4.1.2` |
+| Counts are clamped | `999999999` stored as 5000, `-50` as 0, `"abc"` as 0 |
+| Origins are validated | `not-an-origin`, a URL with a path, `javascript:`, `file://` all rejected |
+| Rate limiting is genuinely shared | Tripped 429 earlier than the local cap would allow, because earlier requests to other instances counted |
+| It degrades | Before the store existed, the endpoint reported `configured: false` with a reason, and the UI said so instead of showing an empty box |
+| Nothing about the caller is stored | The stored record holds only `audits`, `lastAt`, `lastCounts` and rule counts |
+
+### Two real bugs this found
+
+Both were in shipped code, and neither would have surfaced without wiring the
+store up and watching real traffic.
+
+**The audit key fingerprinted the wrong document.** The Audit view rederived
+the shared-memory key with `auditKey(document, origin)`, where `document` is
+Yolo Learn's own page rather than the page being audited. Every audited URL on
+one origin would have collapsed onto a single fingerprint, and the fingerprint
+would never change when the target page did: the store would have confidently
+reported two unrelated pages as the same page. The audit already computed the
+correct key internally and simply never returned it. Four regression tests.
+
+**An iframe render race made a broken audit look clean.** The render path
+waited a flat 1200ms and never waited for the `load` event. On a real page with
+inlined stylesheets and remote images the timeout usually won, so the frame was
+measured before its body existed, producing an audit with zero findings that
+was indistinguishable from a clean page. That is precisely the failure this
+project refuses everywhere else. It now waits for load with a six second
+ceiling and a short settle window, and a failed render sets `renderFailed`,
+says in the notes that zero findings means zero checks ran, and produces no key
+so nothing is ever published for a page that never rendered.
+
+The second bug survived because **nothing in the suite touched `auditHTML`**.
+Every audit test went through `auditDocument`, so the whole iframe path behind
+both the paste and URL features was uncovered. Three tests now pin the failure
+behaviour. The happy path cannot be asserted in jsdom, which does not render
+`srcdoc`, so it is verified in a real browser and the test says so rather than
+pretending otherwise.
 
 ## 7. Limitations - what is NOT verified
 
