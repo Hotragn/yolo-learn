@@ -1,0 +1,208 @@
+import { safeGetItem, safeSetItem } from "./types"
+import { CrawlResult, readFlowAcrossPages } from "./crawl"
+
+/**
+ * Memory for real sites, so a page is read once rather than once per visit.
+ *
+ * This is the claim that matters for cost: an agent driving a site by reading
+ * the accessibility tree pays for that read on every single visit, forever. A
+ * cache hit here costs one hash and returns the shape immediately.
+ *
+ * Keyed by origin plus a fingerprint of the SHAPE, not of the bytes. Page
+ * content changes constantly - a headline, a timestamp, a promo - and none of
+ * that changes what the task is. The fingerprint is built from step intents
+ * and field purposes only, so a hit survives ordinary churn and a miss means
+ * the task itself actually moved.
+ */
+
+const KEY = "remote.v1"
+const MAX_ENTRIES = 40
+
+export interface RemoteMemory {
+  origin: string
+  startUrl: string
+  fingerprint: string
+  learnedAt: string
+  steps: CrawlResult["steps"]
+  /** Bytes of markup read to learn it, so the saving can be stated in numbers. */
+  bytesRead: number
+  visits: number
+}
+
+/** Shape only: intents and purposes. Content churn must not invalidate a task. */
+export function fingerprintOf(steps: CrawlResult["steps"]): string {
+  const shape = steps
+    .map((s) => `${s.intent}|${s.fields.map((f) => f.purpose).sort().join(",")}`)
+    .join(";")
+  let h = 0
+  for (let i = 0; i < shape.length; i++) {
+    h = (h * 31 + shape.charCodeAt(i)) | 0
+  }
+  return (h >>> 0).toString(16)
+}
+
+function load(): Record<string, RemoteMemory> {
+  try {
+    const parsed = JSON.parse(safeGetItem(KEY) ?? "{}")
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, RemoteMemory>) : {}
+  } catch {
+    return {}
+  }
+}
+
+function save(all: Record<string, RemoteMemory>) {
+  const entries = Object.entries(all)
+  // Oldest out first, so a long session cannot fill localStorage.
+  if (entries.length > MAX_ENTRIES) {
+    entries.sort((a, b) => (a[1].learnedAt < b[1].learnedAt ? 1 : -1))
+    all = Object.fromEntries(entries.slice(0, MAX_ENTRIES))
+  }
+  safeSetItem(KEY, JSON.stringify(all))
+}
+
+function originOf(url: string): string | null {
+  try {
+    return new URL(url).origin
+  } catch {
+    return null
+  }
+}
+
+export function forgetRemote() {
+  safeSetItem(KEY, "{}")
+}
+
+export function knownRemotes(): RemoteMemory[] {
+  return Object.values(load()).sort((a, b) => (a.learnedAt < b.learnedAt ? 1 : -1))
+}
+
+export interface RecallResult {
+  state: "miss" | "hit"
+  origin: string
+  memory?: RemoteMemory
+  summary: string
+}
+
+/**
+ * Ask whether this site's task is already known, without reading it.
+ *
+ * Deliberately does NOT fetch. The whole point is that a hit costs nothing: a
+ * lookup that had to fetch the page first would save no time at all.
+ */
+export function recallRemote(url: string): RecallResult {
+  const origin = originOf(url)
+  if (!origin) return { state: "miss", origin: "", summary: "That is not a URL." }
+  const memory = load()[origin]
+  if (!memory) {
+    return {
+      state: "miss",
+      origin,
+      summary: `Nothing known about ${origin}. Call learn_url to read it once.`,
+    }
+  }
+  return {
+    state: "hit",
+    origin,
+    memory,
+    summary:
+      `${origin} is already known: ${memory.steps.length} step(s), ` +
+      `${memory.steps.reduce((n, s) => n + s.fields.length, 0)} field(s), learned ` +
+      `${new Date(memory.learnedAt).toLocaleString()}. Nothing needs re-reading. ` +
+      `Reading it the first time cost ${Math.round(memory.bytesRead / 1024)}KB of markup; this hit cost none.`,
+  }
+}
+
+export interface LearnUrlResult {
+  ok: boolean
+  cached: boolean
+  origin: string
+  fingerprint?: string
+  steps: CrawlResult["steps"]
+  notes: string[]
+  stoppedBecause?: string
+  bytesRead: number
+  summary: string
+}
+
+/**
+ * Learn a real site's task once, then serve it from memory.
+ *
+ * `force` re-reads and compares, which is how a shape change is detected: same
+ * origin, different fingerprint means the task moved.
+ */
+export async function learnUrl(
+  url: string,
+  opts: { force?: boolean; onProgress?: (n: string) => void } = {}
+): Promise<LearnUrlResult> {
+  const origin = originOf(url)
+  if (!origin) {
+    return { ok: false, cached: false, origin: "", steps: [], notes: [], bytesRead: 0, summary: "That is not a URL." }
+  }
+
+  if (!opts.force) {
+    const recalled = recallRemote(url)
+    if (recalled.state === "hit" && recalled.memory) {
+      const all = load()
+      all[origin] = { ...recalled.memory, visits: recalled.memory.visits + 1 }
+      save(all)
+      return {
+        ok: true,
+        cached: true,
+        origin,
+        fingerprint: recalled.memory.fingerprint,
+        steps: recalled.memory.steps,
+        notes: ["Served from memory. No page was fetched and no markup was read."],
+        bytesRead: 0,
+        summary: recalled.summary,
+      }
+    }
+  }
+
+  const crawl = await readFlowAcrossPages(url, { onProgress: opts.onProgress })
+  if (!crawl.ok) {
+    return {
+      ok: false,
+      cached: false,
+      origin,
+      steps: [],
+      notes: crawl.notes,
+      stoppedBecause: crawl.stoppedBecause,
+      bytesRead: 0,
+      summary: `Could not read a task at ${origin}: ${crawl.stoppedBecause}`,
+    }
+  }
+
+  const fingerprint = fingerprintOf(crawl.steps)
+  const previous = load()[origin]
+  const bytesRead = crawl.bytesRead
+
+  const all = load()
+  all[origin] = {
+    origin,
+    startUrl: url,
+    fingerprint,
+    learnedAt: new Date().toISOString(),
+    steps: crawl.steps,
+    bytesRead,
+    visits: (previous?.visits ?? 0) + 1,
+  }
+  save(all)
+
+  const moved = previous && previous.fingerprint !== fingerprint
+  return {
+    ok: true,
+    cached: false,
+    origin,
+    fingerprint,
+    steps: crawl.steps,
+    notes: crawl.notes,
+    stoppedBecause: crawl.stoppedBecause,
+    bytesRead,
+    summary:
+      `Read ${origin} across ${crawl.steps.length} page(s): ` +
+      `${crawl.steps.reduce((n, s) => n + s.fields.length, 0)} field(s), ${Math.round(bytesRead / 1024)}KB of markup. ` +
+      (moved
+        ? `The shape CHANGED since last time (${previous!.fingerprint} to ${fingerprint}), so the stored task moved.`
+        : `Stored as ${fingerprint}. The next visit is a free cache hit.`),
+  }
+}

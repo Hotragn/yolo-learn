@@ -38,7 +38,7 @@ import { getFlow, loadFlows, logEvent, patchFlow } from "./store"
 import { detectDrift, effectiveStatus, healFlow, storedValue } from "./drift"
 import { loadRun, normalizeParams, runFlowInteractive } from "./runner"
 import { auditDocument, auditUrl } from "./audit/run"
-import { readFlowAcrossPages } from "./crawl"
+import { knownRemotes, learnUrl, recallRemote } from "./remote"
 import { beginTeaching } from "./TeachMode"
 
 export interface ToolAnnotations {
@@ -672,6 +672,99 @@ export async function registerStaticTools(): Promise<void> {
             `${result.steps.reduce((n, st) => n + st.fields.length, 0)} field(s) total. Nothing was submitted.`
           : `Could not read a flow at ${url}: ${result.stoppedBecause}`,
         ...result,
+      }
+    },
+  })
+
+  await registerTool({
+    name: "recall_url",
+    description:
+      "Ask whether a real site's task is already known, WITHOUT fetching it. Call this before learn_url on any " +
+      "URL. A hit returns the stored steps and fields immediately and costs no page read at all, which is the " +
+      "whole point: an agent that re-reads a site's DOM on every visit pays that cost forever. Keyed by origin " +
+      "and a fingerprint of the task's shape, so ordinary content churn does not invalidate it.",
+    inputSchema: {
+      type: "object",
+      properties: { url: { type: "string", description: "An http or https URL" } },
+      required: ["url"],
+    },
+    annotations: { readOnlyHint: true, untrustedContentHint: true },
+    execute: async (args, { signal }) => {
+      const bad = aborted(signal)
+      if (bad) return bad
+      const url = coerceValue(args.url).trim()
+      if (!url) return { error: "Pass a url." }
+      const recalled = recallRemote(url)
+      return {
+        summary: recalled.summary,
+        state: recalled.state,
+        origin: recalled.origin,
+        known: recalled.memory
+          ? {
+              learnedAt: recalled.memory.learnedAt,
+              visits: recalled.memory.visits,
+              fingerprint: recalled.memory.fingerprint,
+              bytesReadFirstTime: recalled.memory.bytesRead,
+              steps: recalled.memory.steps.map((st) => ({
+                order: st.order,
+                intent: st.intent,
+                fields: st.fields.map((f) => `${f.purpose} (from ${f.from})`),
+              })),
+            }
+          : null,
+        alsoKnown: knownRemotes().map((m) => m.origin),
+      }
+    },
+  })
+
+  await registerTool({
+    name: "learn_url",
+    description:
+      "Read a task on a real public site, across as many pages as it spans, then remember it. Fetched " +
+      "server-side and read in this browser. STRICTLY READ-ONLY: GET requests only, it never submits a form, " +
+      "never fills a field on the target, and never follows a POST, because a real checkout is somebody's order " +
+      "pipeline. Returns each step with every field's purpose and where that purpose was read from. A second " +
+      "call is served from memory for free unless you pass force.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "An http or https URL of a public page" },
+        force: { type: "boolean", description: "Re-read even if known, to detect a changed shape" },
+      },
+      required: ["url"],
+    },
+    annotations: { readOnlyHint: true, untrustedContentHint: true },
+    execute: async (args, { signal }) => {
+      const bad = aborted(signal)
+      if (bad) return bad
+      const url = coerceValue(args.url).trim()
+      if (!url) return { error: "Pass a url." }
+      const out = await learnUrl(url, { force: args.force === true })
+      if (out.ok && !out.cached) {
+        logEvent("learn", `Read ${out.origin} across ${out.steps.length} page(s), read-only`)
+      }
+      return {
+        summary: out.summary,
+        servedFromMemory: out.cached,
+        origin: out.origin,
+        fingerprint: out.fingerprint,
+        bytesRead: out.bytesRead,
+        steps: out.steps.map((st) => ({
+          order: st.order,
+          url: st.url,
+          intent: st.intent,
+          submitLabel: st.submitLabel,
+          advancedBy: st.advancedBy,
+          fields: st.fields.map((f) => ({
+            purpose: f.purpose,
+            label: f.label,
+            readFrom: f.from,
+            required: f.required,
+          })),
+          refusedFields: st.refused,
+        })),
+        notes: out.notes,
+        stoppedBecause: out.stoppedBecause,
       }
     },
   })

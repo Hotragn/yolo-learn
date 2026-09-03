@@ -38,6 +38,8 @@ export interface CrawlResult {
   steps: CrawlStep[]
   notes: string[]
   stoppedBecause: string
+  /** Markup actually read, so the cost of a first visit is a number. */
+  bytesRead: number
 }
 
 const NEXT_TEXT = /^\s*(next|continue|proceed|checkout|check\s*out|start|begin|get\s+started|sign\s*up|register|apply)\b/i
@@ -140,10 +142,11 @@ export async function readFlowAcrossPages(
   try {
     origin = new URL(startUrl).origin
   } catch {
-    return { ok: false, startUrl, origin: "", steps, notes, stoppedBecause: "That is not a URL." }
+    return { ok: false, startUrl, origin: "", steps, notes, bytesRead: 0, stoppedBecause: "That is not a URL." }
   }
 
   let url = startUrl
+  let bytesRead = 0
   let stoppedBecause = `Reached the ${maxSteps}-page cap.`
 
   for (let i = 0; i < maxSteps; i++) {
@@ -160,6 +163,7 @@ export async function readFlowAcrossPages(
       break
     }
 
+    bytesRead += page.html.length
     const landed = page.finalUrl ?? url
     if (!sameOrigin(landed, origin)) {
       stoppedBecause = `The flow left ${origin}, so the walk stopped rather than following it off-site.`
@@ -197,6 +201,7 @@ export async function readFlowAcrossPages(
     origin,
     steps,
     notes,
+    bytesRead,
     stoppedBecause,
   }
 }
