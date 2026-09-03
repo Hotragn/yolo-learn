@@ -1,22 +1,8 @@
 import { useState } from "react"
 import { readFormFromHTML, StaticReadResult } from "./discover"
+import { LearnUrlPanel } from "./LearnUrlPanel"
 import { logEvent } from "./store"
 import { IconAlert, IconCheck, IconNoKey, IconRead } from "./icons"
-
-/**
- * Read a form this app did not write.
- *
- * The demo learns a clinic we authored and survives a redesign we authored,
- * which is a fair thing for a reviewer to be suspicious of. This page exists
- * so the suspicion can be settled instead of argued: paste the markup of any
- * real form and watch the same field-reading code work on it, including where
- * it got each purpose from and what it refused to touch.
- *
- * The samples below are written to be structurally unlike our clinic on
- * purpose: no labels wired with "for", purposes hiding in autocomplete tokens,
- * a select with real option values, a honeypot, a password. They are still
- * samples though, and the paste box is the part that actually proves anything.
- */
 
 const SAMPLES: { name: string; note: string; html: string }[] = [
   {
@@ -86,8 +72,15 @@ const SAMPLES: { name: string; note: string; html: string }[] = [
 export function AnyForm() {
   const [html, setHtml] = useState("")
   const [result, setResult] = useState<StaticReadResult | null>(null)
+  const [htmlError, setHtmlError] = useState<string | null>(null)
 
   const read = (source: string) => {
+    if (!source.trim()) {
+      setResult(null)
+      setHtmlError("Paste the HTML of a form first.")
+      return
+    }
+    setHtmlError(null)
     const out = readFormFromHTML(source)
     setResult(out)
     logEvent(
@@ -100,11 +93,16 @@ export function AnyForm() {
 
   return (
     <main>
-      <h1>Read a form this app did not write</h1>
+      <h1>A site you already use</h1>
       <p className="sub">
-        The demo learns a clinic we built, and survives a redesign we wrote. That is worth being suspicious of. So
-        paste the markup of any real form here and watch the same code read it.
+        Agents pay a full page-read on every visit. After one successful read here, the next visit is a cache hit.
+        No extension: you paste the URL, or you click through in another tab and paste the pages you opened.
       </p>
+
+      <LearnUrlPanel />
+
+      <h2>Or paste form HTML</h2>
+      <p className="sub">Same field-reading code as the clinic, on markup this app did not write.</p>
 
       <div className="any-samples">
         <span className="explain-tag">Or start from a sample</span>
@@ -131,19 +129,27 @@ export function AnyForm() {
 
       <label className="field">
         <span>
-          HTML <small>right-click a real form, Inspect, then Copy outer HTML</small>
+          HTML <small>copy outer HTML from the form in your browser</small>
         </span>
         <textarea
           rows={9}
           className="any-input"
           spellCheck={false}
-          placeholder={'<form>\n  <label>Your name <input name="full_name" required></label>\n  <button>Continue</button>\n</form>'}
           value={html}
-          onChange={(e) => setHtml(e.target.value)}
+          onChange={(e) => {
+            setHtml(e.target.value)
+            setHtmlError(null)
+          }}
         />
       </label>
+      {htmlError && (
+        <p className="hint-warn" role="alert">
+          <IconAlert size={15} />
+          <span>{htmlError}</span>
+        </p>
+      )}
       <div className="row">
-        <button className="primary" onClick={() => read(html)}>
+        <button className="primary" onClick={() => read(html)} disabled={!html.trim()}>
           <IconRead size={17} /> Read this form
         </button>
         {(html || result) && (
@@ -252,9 +258,9 @@ export function AnyForm() {
         <div className="explain-card">
           <span className="explain-tag">It does not prove</span>
           <p>
-            It cannot walk a wizard here, because that needs the site's own JavaScript and this only has its markup. Nor
-            can it register a tool on somebody else's page: a WebMCP tool belongs to the document that registers it, so
-            reaching real sites needs a browser extension.
+            It cannot walk a wizard from markup alone, because that needs the site&apos;s own JavaScript. It will not
+            POST on someone else&apos;s checkout. WebMCP tools register on this page; the agent calls{" "}
+            <code>learn_url</code> / <code>recall_url</code> here after you paste URLs or markup.
           </p>
         </div>
       </div>

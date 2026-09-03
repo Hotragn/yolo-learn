@@ -290,8 +290,11 @@ export async function auditUrl(url: string, options: RunOptions = {}): Promise<A
       ...(page.notes ?? []),
       "No JavaScript from the target ran, so anything it renders client-side is not measured here." +
         (bodyText.length < 400 ? " This page returned very little static text, which usually means exactly that." : ""),
+      !/<form[\s>]/i.test(page.html ?? "")
+        ? "No <form> in the static HTML. A JS-only page cannot be audited here. Use the W3C before/after demos, or paste markup of a real form."
+        : "",
       ...result.notes,
-    ],
+    ].filter((n): n is string => !!n),
   }
 }
 

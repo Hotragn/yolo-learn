@@ -148,7 +148,7 @@ export function AgentConsole() {
                       </span>
                       {prop.enum?.length ? (
                         <select value={args[key] ?? ""} onChange={(e) => setArgs((a) => ({ ...a, [key]: e.target.value }))}>
-                          <option value="">{demo ? `leave empty to reuse "${demo}"` : "not supplied"}</option>
+                          <option value="">{demo ? "Reuse stored value" : "Choose"}</option>
                           {prop.enum.map((o) => (
                             <option key={o} value={o}>
                               {o}
@@ -158,14 +158,14 @@ export function AgentConsole() {
                       ) : prop.type === "object" || prop.type === "array" ? (
                         <textarea
                           rows={3}
-                          placeholder={prop.type === "array" ? '[{"questionId":"q_insurance_id","answer":"INS-1"}]' : "{}"}
+                          aria-label={prop.description ?? key}
                           value={args[key] ?? ""}
                           onChange={(e) => setArgs((a) => ({ ...a, [key]: e.target.value }))}
                         />
                       ) : (
                         <input
                           value={args[key] ?? ""}
-                          placeholder={demo ? `leave empty to reuse "${demo}"` : "not supplied"}
+                          aria-label={prop.description ?? key}
                           onChange={(e) => setArgs((a) => ({ ...a, [key]: e.target.value }))}
                         />
                       )}

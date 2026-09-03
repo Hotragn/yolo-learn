@@ -143,12 +143,24 @@ const SAMPLE = `<main style="background:#ffffff;font-family:system-ui">
   <div id="dup"></div><div id="dup"></div>
 </main>`
 
+const SUGGESTED = [
+  {
+    label: "W3C, built badly",
+    href: "https://www.w3.org/WAI/demos/bad/before/home.html",
+  },
+  {
+    label: "W3C, built properly",
+    href: "https://www.w3.org/WAI/demos/bad/after/home.html",
+  },
+]
+
 export function Audit() {
   const [active, setActive] = useState<Lens | null>(null)
   const [reports, setReports] = useState<LensReport[]>([])
   const [result, setResult] = useState<AuditResult | null>(null)
-  const [html, setHtml] = useState(SAMPLE)
+  const [html, setHtml] = useState("")
   const [url, setUrl] = useState("")
+  const [urlError, setUrlError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [shared, setShared] = useState<SharedMemory | null>(null)
 
@@ -180,7 +192,11 @@ export function Audit() {
   }
 
   const runOnUrl = async () => {
-    if (!url.trim()) return
+    if (!url.trim()) {
+      setUrlError("Enter a public http or https URL.")
+      return
+    }
+    setUrlError(null)
     setBusy(true)
     setResult(null)
     try {
@@ -206,6 +222,7 @@ export function Audit() {
   }
 
   const runOnHTML = async () => {
+    if (!html.trim()) return
     setBusy(true)
     setResult(null)
     try {
@@ -250,24 +267,41 @@ export function Audit() {
           <div className="url-row">
             <input
               type="url"
-              placeholder="https://example.com/contact"
+              autoComplete="url"
               value={url}
-              onChange={(e) => setUrl(e.target.value)}
+              onChange={(e) => {
+                setUrl(e.target.value)
+                setUrlError(null)
+              }}
             />
             <button className="primary" type="submit" disabled={busy || !url.trim()}>
               <IconRead size={17} /> {busy ? "Reading..." : "Audit it"}
             </button>
           </div>
         </label>
-        <p className="explain-note">
-          Want to see where each field's <i>purpose</i> came from rather than what is wrong with it?{" "}
-          <a href="#/any">Read a form instead</a>.
+        {urlError && (
+          <p className="hint-warn" role="alert">
+            <IconAlert size={15} />
+            <span>{urlError}</span>
+          </p>
+        )}
+        <p className="row" style={{ marginTop: 8, flexWrap: "wrap", gap: 8 }}>
+          {SUGGESTED.map((s) => (
+            <button
+              key={s.href}
+              type="button"
+              onClick={() => {
+                setUrl(s.href)
+                setUrlError(null)
+              }}
+            >
+              {s.label}
+            </button>
+          ))}
         </p>
         <p className="explain-note">
-          A serverless function fetches the page, because a browser is not allowed to read another origin. The three
-          lenses still run here, in your browser, in a sandboxed frame with scripts disabled. Nothing from the target
-          page executes, which also means a site that renders its content with JavaScript will look nearly empty. Only
-          public pages: private and reserved addresses are refused.
+          Static HTML only. Client-rendered pages look empty because their JavaScript never runs. Private addresses are
+          refused.
         </p>
       </form>
 
@@ -275,10 +309,14 @@ export function Audit() {
         <button className="primary" onClick={() => void runOnThisPage()} disabled={busy}>
           <IconRun size={17} /> Audit this page
         </button>
-        <button onClick={() => void runOnHTML()} disabled={busy}>
+        <button onClick={() => void runOnHTML()} disabled={busy || !html.trim()}>
           <IconRead size={17} /> Audit the markup below
         </button>
+        <button type="button" onClick={() => setHtml(SAMPLE)} disabled={busy}>
+          Load a broken example
+        </button>
         <button
+          type="button"
           onClick={() => {
             forgetAudits()
             setResult(null)
@@ -292,7 +330,7 @@ export function Audit() {
 
       <label className="field">
         <span>
-          Markup to audit <small>paste a real form here, or edit the sample</small>
+          Markup to audit
         </span>
         <textarea rows={9} className="any-input" spellCheck={false} value={html} onChange={(e) => setHtml(e.target.value)} />
       </label>

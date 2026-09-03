@@ -1,5 +1,5 @@
 import { safeGetItem, safeSetItem } from "./types"
-import { CrawlResult, readFlowAcrossPages } from "./crawl"
+import { CrawlResult, readFlowAcrossPages, readPagesInOrder } from "./crawl"
 
 /**
  * Memory for real sites, so a page is read once rather than once per visit.
@@ -132,15 +132,17 @@ export interface LearnUrlResult {
  */
 export async function learnUrl(
   url: string,
-  opts: { force?: boolean; onProgress?: (n: string) => void } = {}
+  opts: { force?: boolean; pages?: string[]; onProgress?: (n: string) => void } = {}
 ): Promise<LearnUrlResult> {
-  const origin = originOf(url)
+  const trail = (opts.pages ?? []).map((p) => p.trim()).filter(Boolean)
+  const start = trail[0] || url
+  const origin = originOf(start)
   if (!origin) {
     return { ok: false, cached: false, origin: "", steps: [], notes: [], bytesRead: 0, summary: "That is not a URL." }
   }
 
-  if (!opts.force) {
-    const recalled = recallRemote(url)
+  if (!opts.force && trail.length === 0) {
+    const recalled = recallRemote(start)
     if (recalled.state === "hit" && recalled.memory) {
       const all = load()
       all[origin] = { ...recalled.memory, visits: recalled.memory.visits + 1 }
@@ -158,7 +160,9 @@ export async function learnUrl(
     }
   }
 
-  const crawl = await readFlowAcrossPages(url, { onProgress: opts.onProgress })
+  const crawl = trail.length
+    ? await readPagesInOrder(trail, { onProgress: opts.onProgress })
+    : await readFlowAcrossPages(start, { onProgress: opts.onProgress })
   if (!crawl.ok) {
     return {
       ok: false,

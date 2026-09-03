@@ -28,9 +28,9 @@ export interface TourStop {
 const STOPS: TourStop[] = [
   {
     target: "[data-tour='explainer']",
-    title: "Start here if nothing else makes sense",
+    title: "The clinic is a harness",
     body:
-      "This page is the product AND a pretend clinic for it to practise on. The clinic is invented. Nothing you do here books anything.",
+      "Northside is fictional so a WebMCP tool can live on this origin. The product is remembering a task so visit two is free.",
   },
   {
     target: "[data-tour='detect']",
@@ -63,10 +63,16 @@ const STOPS: TourStop[] = [
       "It reads the clinic's form and builds a tool from what it found. Nobody demonstrates anything, and it invents nothing: it stores the shape of the task, never your values.",
   },
   {
+    target: "[data-tour='url-learn']",
+    title: "A site you already use",
+    body:
+      "Paste a public URL. The first visit reads the task. The next visit fetches nothing. You can also click through in another tab, then add those URLs.",
+  },
+  {
     target: "[data-tour='nav-audit']",
     title: "Audit: three lenses over any page",
     body:
-      "We wrote the clinic and its redesign, so of course it survives. Paste any real URL here instead and three specialist passes read it, each citing the rule it used.",
+      "Paste a real URL. Three specialist passes read the same DOM. Each finding cites a published rule or says it is our preference.",
   },
   {
     target: "[data-tour='guided']",

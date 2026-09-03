@@ -1385,7 +1385,19 @@ header nav a { white-space: nowrap; }
   .lens-legend { grid-template-columns: 1fr; }
 }
 
-.url-bar { margin: 4px 0 18px; }
+.url-learn { margin: 22px 0 8px; }
+.trail-toggle {
+  display: inline-block;
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--ink-soft);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 .url-row { display: flex; gap: 8px; }
 .url-row input { flex: 1; font-family: var(--mono); font-size: 14px; }
 .url-row button { white-space: nowrap; }

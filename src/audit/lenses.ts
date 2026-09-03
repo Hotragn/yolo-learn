@@ -56,6 +56,62 @@ export interface LensReport {
   notes: string[]
 }
 
+/**
+ * SC 2.5.8's inline exception, evaluated rather than waved through as a disclaimer.
+ *
+ * A text link whose height is the surrounding line-height, or that sits in a
+ * sentence, is exempt. An 18x18 icon button is not. Width already at or above
+ * 24px with a line-height-capped height is a line of text, not a missed tap target.
+ */
+export function isTargetSizeExempt(args: {
+  tagName: string
+  display: string
+  width: number
+  height: number
+  fontSize: number
+  lineHeight: number
+  inSentence: boolean
+}): boolean {
+  if (Math.min(args.width, args.height) >= 24) return true
+  const tag = args.tagName.toUpperCase()
+  if (tag !== "A") return false
+  if (args.inSentence) return true
+  if (args.display === "inline") return true
+  const cap = Math.max(args.lineHeight || 0, args.fontSize * 1.5) + 2
+  return args.width >= 24 && args.height <= cap
+}
+
+/** One row per repeated target-size class, not one row per footer link. */
+export function collapseRepeatedFindings(findings: Finding[]): void {
+  const others = findings.filter((f) => f.rule.id !== "wcag-2.5.8")
+  const targets = findings.filter((f) => f.rule.id === "wcag-2.5.8")
+  if (targets.length < 2) return
+  const groups = new Map<string, Finding[]>()
+  for (const f of targets) {
+    const stem = f.element.replace(/#[^\s.[\]]+/g, "").trim() || f.element
+    const key = `${f.measured}|${stem}`
+    const g = groups.get(key) ?? []
+    g.push(f)
+    groups.set(key, g)
+  }
+  const collapsed: Finding[] = []
+  for (const group of groups.values()) {
+    const first = group[0]
+    if (group.length === 1) {
+      collapsed.push(first)
+      continue
+    }
+    const stem = first.element.replace(/#[^\s.[\]]+/g, "").trim() || "targets"
+    collapsed.push({
+      ...first,
+      element: `${group.length} similar ${stem}`,
+      detail: `${group.length} pointer targets share this size (${first.measured}). Listed once. ${first.detail}`,
+    })
+  }
+  findings.length = 0
+  findings.push(...others, ...collapsed)
+}
+
 const W = (frag: string) => `https://www.w3.org/TR/WCAG22/#${frag}`
 
 export const RULES: Record<string, Rule> = {
@@ -454,31 +510,59 @@ export function themeLens(ctx: Ctx): LensReport {
     }
   }
 
-  // Target size. SC 2.5.8 wants 24x24 CSS px, with exceptions this does not
-  // evaluate, so these are reported as needing a human decision.
-  let exceptionsNoted = false
+  // Target size. SC 2.5.8 wants 24x24 CSS px. The inline exception is
+  // evaluable: a text link whose height is the surrounding line-height, or
+  // that sits in a sentence, is exempt. Nav/footer link lists on marketing
+  // pages are exactly that, and listing each one is noise rather than a finding.
+  let targetFlagged = 0
+  let targetExempt = 0
   for (const el of ctx.doc.querySelectorAll<HTMLElement>("a[href], button, input[type=checkbox], input[type=radio], [role=button]")) {
     if (isHidden(el)) continue
     const r = el.getBoundingClientRect()
     if (!r.width && !r.height) continue
     checked++
-    const inlineInText = el.tagName === "A" && !!el.closest("p, li, td")
-    if (Math.min(r.width, r.height) < 24 && !inlineInText) {
+    const style = ctx.win.getComputedStyle(el)
+    const fontSize = parseFloat(style.fontSize) || 16
+    const lineHeightRaw = parseFloat(style.lineHeight)
+    const lineHeight = Number.isFinite(lineHeightRaw) ? lineHeightRaw : fontSize * 1.2
+    const parent = el.parentElement ? ctx.win.getComputedStyle(el.parentElement) : null
+    const parentLine = parent ? parseFloat(parent.lineHeight) : NaN
+    const surroundingLine = Number.isFinite(parentLine) ? parentLine : lineHeight
+    if (
+      isTargetSizeExempt({
+        tagName: el.tagName,
+        display: style.display,
+        width: r.width,
+        height: r.height,
+        fontSize,
+        lineHeight: surroundingLine,
+        inSentence: !!el.closest("p, li, td, dd, blockquote, figcaption, label"),
+      })
+    ) {
+      targetExempt++
+      continue
+    }
+    if (Math.min(r.width, r.height) < 24) {
+      targetFlagged++
       findings.push({
         lens: "theme",
         severity: "low",
         rule: RULES.target,
         element: describeElement(el),
-        detail: `${Math.round(r.width)}x${Math.round(r.height)} CSS px. SC 2.5.8 asks for 24x24, but has spacing, inline and essential exceptions that this does not evaluate, so confirm before acting.`,
+        detail: `${Math.round(r.width)}x${Math.round(r.height)} CSS px. SC 2.5.8 asks for 24x24 CSS pixels. Spacing and essential exceptions are not evaluated here.`,
         measured: `${Math.round(r.width)}x${Math.round(r.height)}`,
         threshold: "24x24",
         certainty: "exact",
       })
-      exceptionsNoted = true
     }
   }
-  if (exceptionsNoted) {
-    notes.push("Target size findings do not account for SC 2.5.8's spacing and inline exceptions.")
+  if (targetExempt > 0) {
+    notes.push(
+      `Skipped ${targetExempt} text-sized link(s) under SC 2.5.8's inline exception (height constrained by line-height, or in a sentence).`
+    )
+  }
+  if (targetFlagged > 0) {
+    notes.push("Remaining target-size findings do not evaluate SC 2.5.8's spacing or essential exceptions.")
   }
 
   // Corner radii off a single scale. Openly a preference, not a rule.
@@ -503,6 +587,7 @@ export function themeLens(ctx: Ctx): LensReport {
     })
   }
 
+  collapseRepeatedFindings(findings)
   return { lens: "theme", checked, findings, unknowns, notes }
 }
 

@@ -205,3 +205,101 @@ export async function readFlowAcrossPages(
     stoppedBecause,
   }
 }
+
+const MAX_TRAIL = 8
+
+/**
+ * Learn the pages the user already opened, in the order they opened them.
+ *
+ * There is no extension and nothing injects into the other tab. After they
+ * navigate by hand they paste the URLs. This still only GETs, still never
+ * submits, and will not follow a URL off the first origin.
+ */
+export async function readPagesInOrder(
+  urls: string[],
+  opts: { onProgress?: (note: string) => void } = {}
+): Promise<CrawlResult> {
+  const progress = opts.onProgress ?? (() => {})
+  const cleaned = [...new Set(urls.map((u) => u.trim()).filter(Boolean))].slice(0, MAX_TRAIL)
+  if (cleaned.length === 0) {
+    return {
+      ok: false,
+      startUrl: "",
+      origin: "",
+      steps: [],
+      notes: [],
+      bytesRead: 0,
+      stoppedBecause: "Paste at least one http(s) URL, one per line.",
+    }
+  }
+
+  let origin: string
+  try {
+    origin = new URL(cleaned[0]).origin
+  } catch {
+    return {
+      ok: false,
+      startUrl: cleaned[0],
+      origin: "",
+      steps: [],
+      notes: [],
+      bytesRead: 0,
+      stoppedBecause: "The first line is not a URL.",
+    }
+  }
+
+  const notes: string[] = []
+  const steps: CrawlStep[] = []
+  const seen = new Set<string>()
+  let bytesRead = 0
+  let stoppedBecause = `Read ${cleaned.length} page(s) you opened.`
+
+  for (let i = 0; i < cleaned.length; i++) {
+    const raw = cleaned[i]
+    let url: string
+    try {
+      url = new URL(raw).toString()
+    } catch {
+      notes.push(`Skipped "${raw}": not a URL.`)
+      continue
+    }
+    if (!sameOrigin(url, origin)) {
+      notes.push(`Skipped ${url}: not on ${origin}.`)
+      continue
+    }
+    if (seen.has(url)) continue
+    seen.add(url)
+
+    progress(`reading page you opened (${i + 1}/${cleaned.length})`)
+    const page = await fetchPage(url)
+    if (page.error || !page.html) {
+      stoppedBecause = page.error ?? "That page returned nothing."
+      break
+    }
+    bytesRead += page.html.length
+    const landed = page.finalUrl ?? url
+    if (!sameOrigin(landed, origin)) {
+      notes.push(`Skipped ${landed}: left ${origin}.`)
+      continue
+    }
+    const read = readFormFromHTML(page.html)
+    if (read.ok) {
+      const step = toStep(steps.length + 1, landed, read)
+      if (i + 1 < cleaned.length) step.advancedBy = "next URL you pasted"
+      steps.push(step)
+    } else {
+      notes.push(`${landed} had no readable form.`)
+    }
+  }
+
+  notes.push("Read-only: GET requests only, from the pages you listed. Nothing submitted.")
+  return {
+    ok: steps.length > 0,
+    startUrl: cleaned[0],
+    origin,
+    steps,
+    notes,
+    bytesRead,
+    stoppedBecause,
+  }
+}

@@ -115,7 +115,7 @@ describe("a page that never renders must not read as clean", () => {
   // failure. That is also why this path went untested long enough for the
   // 1200ms race to survive - nothing in the suite touched auditHTML at all.
   // It is verified in a real browser against the live deployment instead, and
-  // the result is recorded in VERIFICATION.md.
+  // the result is recorded in the README.
   it("measures a document it is handed directly, which is testable here", () => {
     document.body.innerHTML = `<main><form><input name="permit_ref" required><button>Pay now</button></form></main>`
     const out = auditDocument(document, { label: "https://real.example", remember: false })

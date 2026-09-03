@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest"
-import { readFlowAcrossPages } from "../crawl"
+import { readFlowAcrossPages, readPagesInOrder } from "../crawl"
 
 /**
  * The safety rules matter more than the feature here. A tool that walks other
@@ -89,5 +89,28 @@ describe("reading a multi-page flow", () => {
     const out = await readFlowAcrossPages("not a url")
     expect(out.ok).toBe(false)
     expect(out.stoppedBecause).toMatch(/not a URL/i)
+  })
+})
+
+describe("pages the user already opened", () => {
+  it("reads each listed GET page and never follows a POST", async () => {
+    const out = await readPagesInOrder([
+      "https://shop.example.com/start",
+      "https://shop.example.com/step2",
+      "https://shop.example.com/step3",
+    ])
+    expect(out.ok).toBe(true)
+    expect(out.steps.map((s) => s.url)).toEqual([
+      "https://shop.example.com/start",
+      "https://shop.example.com/step2",
+    ])
+    expect(out.notes.join(" ")).toMatch(/no readable form|refused|payment/i)
+    expect(out.steps.every((s) => !s.url.includes("/charge"))).toBe(true)
+  })
+
+  it("will not leave the first origin even if the paste includes another host", async () => {
+    const out = await readPagesInOrder(["https://shop.example.com/start", "https://elsewhere.example.net/x"])
+    expect(out.steps.every((s) => s.url.startsWith("https://shop.example.com"))).toBe(true)
+    expect(out.notes.join(" ")).toMatch(/not on/)
   })
 })

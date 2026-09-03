@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest"
-import { bugLens, contextFor, crossVerify, runLenses, workflowLens } from "../audit/lenses"
+import { bugLens, collapseRepeatedFindings, contextFor, crossVerify, isTargetSizeExempt, RULES, runLenses, workflowLens } from "../audit/lenses"
 
 function docOf(html: string): Document {
   document.body.innerHTML = html
@@ -144,5 +144,51 @@ describe("honesty properties that hold across every lens", () => {
     const reports = runLenses(docOf(`<input>`))
     const bugs = reports.find((r) => r.lens === "bugs")!
     expect(bugs.findings.every((f) => !f.corroboratedBy)).toBe(true)
+  })
+})
+
+describe("target size: evaluate the inline exception instead of listing every nav link", () => {
+  it("exempts a wide, line-height-capped text link", () => {
+    expect(
+      isTargetSizeExempt({
+        tagName: "A",
+        display: "inline-block",
+        width: 183,
+        height: 18,
+        fontSize: 16,
+        lineHeight: 20,
+        inSentence: false,
+      })
+    ).toBe(true)
+  })
+
+  it("does not exempt an 18x18 icon button", () => {
+    expect(
+      isTargetSizeExempt({
+        tagName: "BUTTON",
+        display: "block",
+        width: 18,
+        height: 18,
+        fontSize: 14,
+        lineHeight: 18,
+        inSentence: false,
+      })
+    ).toBe(false)
+  })
+
+  it("collapses dozens of identical footer links into one finding", () => {
+    const findings = Array.from({ length: 24 }, (_, i) => ({
+      lens: "theme" as const,
+      severity: "low" as const,
+      rule: RULES.target,
+      element: `a.link-cta#x${i}`,
+      detail: "too small",
+      measured: "80x18",
+      threshold: "24x24",
+      certainty: "exact" as const,
+    }))
+    collapseRepeatedFindings(findings)
+    expect(findings).toHaveLength(1)
+    expect(findings[0].element).toMatch(/^24 similar/)
   })
 })

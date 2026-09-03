@@ -620,7 +620,7 @@ function RecallPanel({ learning, onLearn }: { learning: boolean; onLearn: () => 
             {learning ? "Reading the page..." : "Learn automatically"}
           </button>
           <a className="ghost-link" href={siteHash("teach=1")}>
-            or demonstrate it yourself
+            watch me fill it in
           </a>
         </div>
       </div>
