@@ -154,7 +154,7 @@ export function LearnUrlPanel({ compact = false }: { compact?: boolean }) {
                 <tr>
                   <th>Step</th>
                   <th>URL</th>
-                  <th>Fields</th>
+                  <th>Fields learned</th>
                 </tr>
               </thead>
               <tbody>
@@ -164,7 +164,21 @@ export function LearnUrlPanel({ compact = false }: { compact?: boolean }) {
                     <td>
                       <code>{s.url.replace(/^https?:\/\//, "")}</code>
                     </td>
-                    <td>{s.fields.map((f) => f.purpose).join(", ") || "none"}</td>
+                    <td>
+                      {s.fields.length === 0
+                        ? "none"
+                        : s.fields.map((f, i) => (
+                            <span key={i} className="field-chip">
+                              {f.label || f.purpose}
+                              {f.required && <small title="required"> *</small>}
+                            </span>
+                          ))}
+                      {s.refused.length > 0 && (
+                        <span className="refused-note" title="Refused (sensitive)">
+                          {" "}— refused {s.refused.length}
+                        </span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

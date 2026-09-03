@@ -1242,6 +1242,9 @@ main > h2:first-of-type {
   border-bottom: 1px solid var(--border);
 }
 .any-table td { padding: 8px 12px 8px 0; border-bottom: 1px solid var(--border); vertical-align: top; }
+.field-chip { display: inline-block; background: var(--accent-wash); border: 1px solid var(--accent-edge); border-radius: 4px; padding: 1px 7px; margin: 2px 3px 2px 0; font-size: 12.5px; }
+.field-chip small { color: var(--warn); font-weight: 600; }
+.refused-note { font-size: 12px; color: var(--warn); opacity: .85; }
 .any-table tr:last-child td { border-bottom: 0; }
 .any-refused {
   margin-top: 16px;
