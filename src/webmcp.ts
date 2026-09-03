@@ -629,3 +629,20 @@ export async function mintStoredFlows(): Promise<void> {
 export function unmintFlow(name: string) {
   if (registry.has(name)) unregisterTool(name)
 }
+
+let initPromise: Promise<void> | null = null
+
+/**
+ * Register the built-ins, then re-mint stored flows. Serialized behind one
+ * promise so React's double-invoked mount effect cannot interleave the two
+ * passes and register tools out of order.
+ */
+export function initTools(): Promise<void> {
+  if (!initPromise) {
+    initPromise = (async () => {
+      await registerStaticTools()
+      await mintStoredFlows()
+    })()
+  }
+  return initPromise
+}

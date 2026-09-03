@@ -16,9 +16,8 @@ import { detectDrift, effectiveStatus, healFlow, storedValue } from "./drift"
 import {
   executeToolByName,
   getToolEntries,
+  initTools,
   mintFlowTool,
-  mintStoredFlows,
-  registerStaticTools,
   subscribeTools,
   ToolEntry,
   unmintFlow,
@@ -49,12 +48,9 @@ export default function App() {
   const { path } = useHashRoute()
 
   useEffect(() => {
-    void (async () => {
-      await registerStaticTools()
-      // The browser's tool registry does not survive a reload, but taught
-      // flows do. Re-mint them so a returning user's tools are all present.
-      await mintStoredFlows()
-    })()
+    // The browser's tool registry does not survive a reload, but taught flows
+    // do, so initTools re-mints them for a returning user.
+    void initTools()
     // A stable handle for scripted QA and for anyone who wants to drive the
     // tools from devtools. It exposes nothing the agent cannot already call.
     ;(window as unknown as Record<string, unknown>).agentMemory = {
@@ -488,6 +484,16 @@ function ToolsView() {
 
 function ToolCard({ entry, highlight }: { entry: ToolEntry; highlight: boolean }) {
   const params = Object.keys(entry.tool.inputSchema?.properties ?? {})
+  // Where there is no WebMCP at all, the banner already says so once. Saying
+  // "mirror registry only" on every card would just be noise; it only carries
+  // information when an agent is present and this tool failed to register.
+  const showRegistration = webmcpStatus().available
+  const notes = [
+    showRegistration ? (entry.native ? "registered with the browser" : "mirror registry only") : null,
+    entry.tool.annotations?.readOnlyHint ? "read only" : null,
+    entry.error ?? null,
+  ].filter(Boolean)
+
   return (
     <div className={"card tool" + (highlight ? " just-minted" : "")}>
       <div className="card-head">
@@ -498,11 +504,9 @@ function ToolCard({ entry, highlight }: { entry: ToolEntry; highlight: boolean }
       <p className="params">
         {params.length === 0 ? <small>no parameters</small> : params.map((p) => <code key={p}>{p}</code>)}
       </p>
-      <small className={entry.native ? "native yes" : "native no"}>
-        {entry.native ? "registered with the browser" : "mirror registry only"}
-        {entry.tool.annotations?.readOnlyHint ? " · read only" : ""}
-        {entry.error ? ` · ${entry.error}` : ""}
-      </small>
+      {notes.length > 0 && (
+        <small className={entry.native ? "native yes" : "native no"}>{notes.join(" · ")}</small>
+      )}
     </div>
   )
 }

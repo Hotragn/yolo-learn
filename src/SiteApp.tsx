@@ -52,6 +52,10 @@ export default function SiteApp() {
   const [filling, setFilling] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
+  // Mirrors `confirm` so unmount can settle a pending approval. Leaving the
+  // page while the dialog is open would otherwise hang the agent's promise
+  // forever, and a hung tool call is worse than a denied one.
+  const pendingConfirm = useRef<ConfirmState | null>(null)
 
   const resetWizard = useCallback(() => {
     setStepIndex(0)
@@ -59,6 +63,7 @@ export default function SiteApp() {
     setHighlight(false)
     setFilling(null)
     setAgentNote(null)
+    pendingConfirm.current = null
     setConfirm(null)
   }, [])
 
@@ -156,20 +161,22 @@ export default function SiteApp() {
         // Human confirmation before every submit, always. An abort while the
         // dialog is open resolves it as a denial instead of hanging the agent.
         const approved = await new Promise<boolean>((resolve) => {
-          const onAbort = () => {
+          let settled = false
+          const settle = (ok: boolean) => {
+            if (settled) return
+            settled = true
+            signal.removeEventListener("abort", onAbort)
+            pendingConfirm.current = null
             setConfirm(null)
-            resolve(false)
+            resolve(ok)
+          }
+          function onAbort() {
+            settle(false)
           }
           signal.addEventListener("abort", onAbort, { once: true })
-          setConfirm({
-            plan,
-            submitLabel,
-            resolve: (ok) => {
-              signal.removeEventListener("abort", onAbort)
-              setConfirm(null)
-              resolve(ok)
-            },
-          })
+          const state: ConfirmState = { plan, submitLabel, resolve: settle }
+          pendingConfirm.current = state
+          setConfirm(state)
         })
 
         const submitted = Object.fromEntries(plan.map((p) => [p.label, p.value]))
@@ -206,7 +213,12 @@ export default function SiteApp() {
         setFilling(null)
       }
     })
-    return () => setRunExecutor(null)
+    return () => {
+      setRunExecutor(null)
+      // Navigating away from the demo site mid-run counts as a denial:
+      // nothing was submitted and the agent gets an answer, not a hang.
+      pendingConfirm.current?.resolve(false)
+    }
   }, [resetWizard])
 
   // The declarative WebMCP form fires these when an agent pre-fills or

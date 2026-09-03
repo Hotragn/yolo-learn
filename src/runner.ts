@@ -68,6 +68,12 @@ function squash(s: string): string {
   return s.trim().replace(/\s+/g, " ").toLowerCase()
 }
 
+function isRealDate(value: string): boolean {
+  if (!DATE_RE.test(value)) return false
+  const parsed = new Date(`${value}T00:00:00Z`)
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value
+}
+
 export function normalizeForField(field: FieldSpec, raw: unknown): { value?: string; error?: string } {
   const value = coerceValue(raw).trim()
   if (!value) return {}
@@ -80,8 +86,10 @@ export function normalizeForField(field: FieldSpec, raw: unknown): { value?: str
     return { value: match }
   }
 
-  if (field.type === "date" && !DATE_RE.test(value)) {
-    return { error: `"${field.label}" must be a calendar date formatted YYYY-MM-DD (received "${value}")` }
+  // A date input holds nothing it cannot parse, so "2026-13-99" would submit
+  // blank. Round-trip the value instead of trusting its shape.
+  if (field.type === "date" && !isRealDate(value)) {
+    return { error: `"${field.label}" must be a real calendar date formatted YYYY-MM-DD (received "${value}")` }
   }
 
   return { value }

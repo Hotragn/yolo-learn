@@ -44,7 +44,17 @@ describe("normalizeForField", () => {
 
   it("rejects a date the input element could never hold", () => {
     expect(normalizeForField(dateField, "next Friday").error).toContain("YYYY-MM-DD")
+    expect(normalizeForField(dateField, "11/09/2026").error).toContain("YYYY-MM-DD")
     expect(normalizeForField(dateField, "2026-09-11")).toEqual({ value: "2026-09-11" })
+  })
+
+  it("rejects a date-shaped string that is not a real date", () => {
+    // A date input silently holds nothing it cannot parse, so shape alone is
+    // not enough: these would submit blank.
+    expect(normalizeForField(dateField, "2026-13-99").error).toContain("real calendar date")
+    expect(normalizeForField(dateField, "2026-02-30").error).toContain("real calendar date")
+    expect(normalizeForField(dateField, "2026-00-10").error).toContain("real calendar date")
+    expect(normalizeForField(dateField, "2028-02-29")).toEqual({ value: "2028-02-29" })
   })
 
   it("treats empty and whitespace-only as not supplied, without erroring", () => {
