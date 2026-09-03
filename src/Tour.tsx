@@ -27,10 +27,10 @@ export interface TourStop {
 
 const STOPS: TourStop[] = [
   {
-    target: "[data-tour='brand']",
-    title: "This page is two things at once",
+    target: "[data-tour='explainer']",
+    title: "Start here if nothing else makes sense",
     body:
-      "Yolo Learn, and a fictional clinic for it to learn. They share one origin because a WebMCP tool belongs to the page that registers it.",
+      "This page is the product AND a pretend clinic for it to practise on. The clinic is invented. Nothing you do here books anything.",
   },
   {
     target: "[data-tour='detect']",
@@ -40,27 +40,27 @@ const STOPS: TourStop[] = [
   },
   {
     target: "[data-tour='nav-site']",
-    title: "Demo site: the clinic",
+    title: "The pretend clinic",
     body:
-      "A four-step booking form, and a v2 of it redesigned a year later. The version switch is what creates the drift the whole product exists to survive.",
+      "A four-step booking form, and a v2 of it redesigned a year later. Switching versions is what breaks the flow, so you can watch it repair.",
   },
   {
     target: "[data-tour='nav-flows']",
-    title: "Flows: what it has learned",
+    title: "What it has learned",
     body:
       "One card per learned task, each with its health against the site as it looks right now, its parameters, and its last three runs.",
   },
   {
     target: "[data-tour='nav-tools']",
-    title: "Tools: the live registry",
+    title: "The tools your agent sees",
     body:
       "Every tool an agent can see. Learning a flow adds one here mid-session, badged new, with no reload. That is the part that is genuinely hard.",
   },
   {
     target: "[data-tour='learn']",
-    title: "Start here",
+    title: "The one button that matters",
     body:
-      "It reads the page and mints a tool for what it found. No demonstration, and nothing invented: it stores the shape of the task, never your values.",
+      "It reads the clinic's form and builds a tool from what it found. Nobody demonstrates anything, and it invents nothing: it stores the shape of the task, never your values.",
   },
   {
     target: "[data-tour='guided']",

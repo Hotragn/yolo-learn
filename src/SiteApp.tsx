@@ -394,6 +394,11 @@ export default function SiteApp() {
           </span>
         </div>
       )}
+      <p className="fake-notice">
+        <span className="fake-badge">not real</span>
+        This is an invented clinic, built so there is a website to learn. No booking is ever sent.
+      </p>
+
       <div className="site-head">
         <h2>Northside Family Clinic</h2>
         <nav className="version-switch" aria-label="Demo site version">

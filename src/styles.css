@@ -1,27 +1,33 @@
-/* Yolo Learn — Slate + Signal Lime
+/* Yolo Learn - quiet light
  *
- * One accent, used as a fill rather than as text. #7BD40A on white is about
- * 1.9:1, so lime never carries text on a light surface: buttons put near-black
- * ink ON lime (about 11:1), and lime-coloured text uses the darkened --accent-ink
- * (about 7.7:1). On dark surfaces the raw lime is safe and does the shouting. */
+ * Light by default, near-neutral greys, and one restrained blue. The previous
+ * palette put a neon lime on near-black, which reads hacker-terminal rather
+ * than considered, and made the accent unusable as text: lime on white is
+ * about 1.9:1, so every lime label needed a separate darkened token.
+ *
+ * Blue at #2757d6 clears 6.4:1 on white in both directions, so the same accent
+ * can be a fill AND carry text. One token, no special cases. Dark mode is
+ * still there behind the toggle; it is just no longer the thing a first-time
+ * visitor meets.
+ */
 
 :root {
   color-scheme: light;
 
-  --ink: #0b1220;
-  --ink-soft: #56637a;
-  --ink-faint: #7c8798;
+  --ink: #16161a;
+  --ink-soft: #5b5b63;
+  --ink-faint: #86868f;
   --surface: #ffffff;
-  --surface-2: #f9fbfd;
-  --page: #f4f6f9;
-  --border: #dfe4ec;
-  --border-strong: #c6ceda;
+  --surface-2: #f6f6f7;
+  --page: #fafafa;
+  --border: #e6e6e8;
+  --border-strong: #d0d0d4;
 
-  --accent: #7bd40a;
-  --accent-ink: #2f5b00;
-  --accent-wash: #eefada;
-  --accent-edge: #cbe98f;
-  --on-accent: #0b1220;
+  --accent: #2757d6;
+  --accent-ink: #1c47b8;
+  --accent-wash: #eef2fe;
+  --accent-edge: #c8d6f8;
+  --on-accent: #ffffff;
 
   --warn: #8a5300;
   --warn-wash: #fff4e0;
@@ -35,12 +41,12 @@
 
   --radius: 12px;
   --radius-sm: 8px;
-  --shadow: 0 1px 2px rgba(11, 18, 32, 0.06), 0 8px 24px -18px rgba(11, 18, 32, 0.35);
+  --shadow: 0 1px 2px rgba(22, 22, 26, 0.05), 0 10px 30px -22px rgba(22, 22, 26, 0.4);
   --mono-legacy: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Mono", Menlo, Consolas, monospace;
 
-  --logo-bg: #0b1220;
-  --logo-ring: #f4f6f9;
-  --logo-mark: #7bd40a;
+  --logo-bg: #16161a;
+  --logo-ring: #fafafa;
+  --logo-mark: #6f9bff;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -56,11 +62,11 @@
     --border: #2b2e31;
     --border-strong: #3d4146;
 
-    --accent: #8ee61b;
-    --accent-ink: #b6f45c;
-    --accent-wash: #1b2a12;
-    --accent-edge: #35521a;
-    --on-accent: #08120a;
+    --accent: #4d7df5;
+    --accent-ink: #9ab6ff;
+    --accent-wash: #141c31;
+    --accent-edge: #2a3d66;
+    --on-accent: #ffffff;
 
     --warn: #f0bf6b;
     --warn-wash: #2a2113;
@@ -85,11 +91,11 @@
   --page: #08090a;
   --border: #2b2e31;
   --border-strong: #3d4146;
-  --accent: #8ee61b;
-  --accent-ink: #b6f45c;
-  --accent-wash: #1b2a12;
-  --accent-edge: #35521a;
-  --on-accent: #08120a;
+  --accent: #4d7df5;
+  --accent-ink: #9ab6ff;
+  --accent-wash: #141c31;
+  --accent-edge: #2a3d66;
+  --on-accent: #ffffff;
   --warn: #f0bf6b;
   --warn-wash: #2a2113;
   --warn-edge: #4d3d1c;
@@ -1107,4 +1113,70 @@ main > h2:first-of-type {
 
 @media (prefers-reduced-motion: reduce) {
   .card { transition: none; }
+}
+
+/* --- the explainer ------------------------------------------------------ */
+/* "What is the clinic?" was the single most common confusion, so it gets a
+   panel of its own rather than a clause buried in the hero. */
+
+.explainer {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin: 18px 0 8px;
+}
+.explain-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+}
+.explain-card.is-product { border-color: var(--accent-edge); background: var(--accent-wash); }
+.explain-tag {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  display: block;
+  margin-bottom: 8px;
+}
+.explain-card.is-product .explain-tag { color: var(--accent-ink); }
+.explain-card h3 { margin: 0 0 8px; font-size: 18px; }
+.explain-card p { margin: 0; font-size: 14.5px; line-height: 1.55; color: var(--ink-soft); }
+.explain-card p + p { margin-top: 8px; }
+.explain-note {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--ink-faint);
+}
+.fake-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--warn-wash);
+  border: 1px solid var(--warn-edge);
+  color: var(--warn);
+  font-size: 12.5px;
+  font-weight: 550;
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+
+@media (max-width: 720px) {
+  .explainer { grid-template-columns: 1fr; }
+}
+
+.fake-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 14px;
+  color: var(--ink-soft);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  margin: 0 0 14px;
 }

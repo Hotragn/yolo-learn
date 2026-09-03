@@ -162,13 +162,13 @@ export default function App() {
               Get started
             </a>
             <a href="#/flows" aria-current={path === "/flows"} data-tour="nav-flows">
-              Flows
+              What it learned
             </a>
             <a href="#/site" aria-current={path === "/site"} data-tour="nav-site">
-              Demo site
+              Demo clinic
             </a>
             <a href="#/tools" aria-current={path === "/tools"} data-tour="nav-tools">
-              Tools
+              Agent tools
             </a>
           </nav>
           <div className="head-right">
@@ -306,21 +306,55 @@ function Onboarding() {
     <main>
       <section className="hero">
         <p className="eyebrow">OpenAI WebMCP Challenge</p>
-        <h1>Agents break when the web changes.</h1>
+        <h1>Teach an AI agent to use a website. Once.</h1>
         <p className="hero-lead">
-          <b>{PRODUCT}</b> reads a site, mints a WebMCP tool for the task, and heals itself when the site is
-          redesigned.
+          Agents cannot use websites they were not built for, and they break when a site changes.{" "}
+          <b>{PRODUCT}</b> reads the site itself and fixes itself.
         </p>
         <div className="hero-actions">
           <a className="cta" href="#/site" data-tour="learn">
             <IconRead size={18} />
-            Let it learn the demo site
+            Let it learn the demo clinic
           </a>
           <a className="ghost-link" href="#/site?teach=1">
             or teach it by hand
           </a>
         </div>
       </section>
+
+      <h2 data-tour="explainer">What you are looking at</h2>
+      <p className="sub">
+        This one page is deliberately two things, because a WebMCP tool belongs to the page that registers it. They
+        have to share an address.
+      </p>
+      <div className="explainer">
+        <div className="explain-card is-product">
+          <span className="explain-tag">The product</span>
+          <h3>{PRODUCT}</h3>
+          <p>
+            Reads a website's forms by itself, remembers the task by what each field is <em>for</em>, and hands your
+            AI agent a tool it can call. When the site changes, it says what changed and repairs itself.
+          </p>
+        </div>
+        <div className="explain-card">
+          <span className="explain-tag">Something to point it at</span>
+          <h3>
+            Northside Family Clinic <span className="fake-badge">not real</span>
+          </h3>
+          <p>
+            A pretend appointment-booking site, invented for this demo. There is no clinic, no booking is ever sent,
+            and nothing leaves your browser.
+          </p>
+          <p>
+            It exists so there is a website to learn. It also has a <b>version 2</b>, redesigned the way a real site
+            would be a year later, which is how you can watch the repair actually happen.
+          </p>
+        </div>
+      </div>
+      <p className="explain-note">
+        In short: press the button, watch it read the fake clinic, then switch the clinic to v2 and watch it survive.
+      </p>
+
 
       <GuidedPanel />
 
@@ -369,7 +403,7 @@ function Onboarding() {
           note={
             taught
               ? `${flows.length} flow(s) known: ${flows.map((f) => f.name).join(", ")}`
-              : "Open the demo site and press Learn automatically. It reads the four-step booking form by itself."
+              : "Open the clinic and press Learn automatically. It reads the four-step booking form by itself."
           }
           href="#/site"
           cta="Open demo site"
@@ -380,7 +414,7 @@ function Onboarding() {
           note={
             ran
               ? "Done. You saw the exact values before anything was sent."
-              : "Run the flow from your flow library, or from the simulated agent below. Nothing is submitted without you."
+              : "Run it from What it learned, or from the simulated agent below. Nothing is submitted without you."
           }
           href="#/flows"
           cta="Go to flows"
@@ -391,7 +425,7 @@ function Onboarding() {
           note={
             healed
               ? "Done. It survived the redesign with one answer."
-              : `Switch the demo site to v2 - the same clinic a year later - then check the flow's health. Site is on v${site.version} now.`
+              : `Switch the clinic to v2, the same clinic a year later, then check the flow's health. Site is on v${site.version} now.`
           }
           href="#/site?v=2"
           cta="Switch to v2"
@@ -658,7 +692,7 @@ function Library() {
           <div className="card empty">
             <b>No flows yet.</b>
             <p className="sub">
-              The fastest way to see this work is to let it learn the demo site by itself - it reads the form and mints
+              The fastest way to see this work is to let it learn the clinic by itself. It reads the form and mints
               a tool without you filling anything in.
             </p>
             <div className="row">
