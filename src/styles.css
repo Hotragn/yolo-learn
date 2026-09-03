@@ -865,3 +865,121 @@ button:tool-submit-active { box-shadow: 0 0 0 3px var(--accent-wash); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
 }
+
+
+/* --- the guided run ----------------------------------------------------- */
+
+.guided {
+  margin-top: 22px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  box-shadow: var(--shadow);
+}
+.guided.running { border-color: var(--accent-edge); }
+.guided-head { display: flex; justify-content: space-between; gap: 18px; align-items: center; flex-wrap: wrap; }
+.guided-head b { display: block; font-size: 17px; letter-spacing: -0.015em; }
+.guided-head span { font-size: 14.5px; color: var(--ink-soft); max-width: 52ch; display: block; }
+.guided-head .row { margin-top: 0; }
+
+.beats { list-style: none; padding: 0; margin: 18px 0 0; border-top: 1px solid var(--border); }
+.beats li {
+  display: grid;
+  grid-template-columns: 22px minmax(140px, 12rem) 1fr;
+  gap: 10px;
+  align-items: baseline;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+  opacity: 0.42;
+}
+.beats li.active, .beats li.done, .beats li.failed { opacity: 1; }
+.beats .bt { display: grid; place-items: center; height: 20px; }
+.beats li.done .bt { color: var(--accent-ink); }
+.beats li.failed .bt { color: var(--bad); }
+.beats .bl { font-weight: 600; letter-spacing: -0.01em; }
+.beats .bd { font-family: var(--mono); font-size: 12.5px; color: var(--ink-soft); }
+.beats li.failed .bd { color: var(--bad); }
+
+.spin {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--accent-edge);
+  border-top-color: var(--accent);
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.guided-wait, .guided-out {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  margin: 14px 0 0;
+  padding: 10px 13px;
+  border-radius: var(--radius-sm);
+  font-size: 14.5px;
+  border: 1px solid transparent;
+}
+.guided-wait { background: var(--warn-wash); border-color: var(--warn-edge); color: var(--warn); }
+.guided-out.ok { background: var(--accent-wash); border-color: var(--accent-edge); color: var(--accent-ink); font-weight: 600; }
+.guided-out.bad { background: var(--bad-wash); border-color: var(--bad-edge); color: var(--bad); }
+
+/* --- recall: what it already knows about this page ---------------------- */
+
+.recall {
+  display: grid;
+  gap: 10px;
+  border-radius: var(--radius);
+  padding: 15px 17px;
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.recall.miss { border-color: var(--accent-edge); background: var(--accent-wash); }
+.recall.hit { border-color: var(--border-strong); }
+.recall.stale { border-color: var(--warn-edge); background: var(--warn-wash); }
+.recall-head { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.recall-head b { letter-spacing: -0.015em; }
+.recall.miss .recall-head b, .recall.miss .recall-head svg { color: var(--accent-ink); }
+.recall.stale .recall-head b, .recall.stale .recall-head svg { color: var(--warn); }
+.recall > span { font-size: 14px; color: var(--ink-soft); }
+.recall .fp {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink-faint);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 9px;
+  white-space: nowrap;
+}
+.recall .row { margin-top: 2px; }
+
+@media (max-width: 640px) {
+  .beats li { grid-template-columns: 22px 1fr; }
+  .beats .bd { grid-column: 2; }
+  .recall .fp { margin-left: 0; }
+}
+
+/* --- the guided dock ---------------------------------------------------- */
+
+.dock {
+  position: sticky;
+  top: 8px;
+  z-index: 40;
+  margin: 14px 0 4px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 12px 16px 4px;
+  box-shadow: 0 10px 30px -14px rgba(0, 0, 0, 0.5);
+}
+.dock.running { border-color: var(--accent); }
+.dock-head { display: flex; align-items: center; gap: 10px; padding-bottom: 8px; }
+.dock-head b { display: flex; align-items: center; gap: 8px; letter-spacing: -0.015em; }
+.dock-head svg { color: var(--accent-ink); }
+.dock-count { margin-left: auto; font-family: var(--mono); font-size: 12.5px; color: var(--ink-faint); }
+.dock .beats { margin-top: 0; max-height: 42vh; overflow: auto; }
+.dock .guided-wait { margin: 10px 0 12px; }

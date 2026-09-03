@@ -25,6 +25,7 @@ import {
   webmcpStatus,
 } from "./webmcp"
 import { clearLastMint, getLastMint, subscribeMint } from "./minted"
+import { DemoSeed, getGuided, resetGuided, runGuidedDemo, seedDemo, subscribeGuided } from "./guided"
 import { TeachProvider } from "./TeachMode"
 import { AgentConsole } from "./AgentConsole"
 import { Modal } from "./Modal"
@@ -96,6 +97,23 @@ function useHashRoute() {
 export default function App() {
   const { path } = useHashRoute()
   const theme = useTheme()
+  const [seeding, setSeeding] = useState<DemoSeed | null>(null)
+
+  // Deep links so any beat of the story is one click away. A reviewer who
+  // abandons the loop halfway would otherwise never reach the payoff.
+  useEffect(() => {
+    const qs = new URLSearchParams(location.hash.split("?")[1] ?? "")
+    const want = qs.get("demo")
+    if (want !== "learned" && want !== "drifted" && want !== "healed") return
+    setSeeding(want)
+    void (async () => {
+      await initTools()
+      const ok = await seedDemo(want)
+      setSeeding(null)
+      location.hash = ok ? "#/flows" : "#/"
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     // The browser's tool registry does not survive a reload, but taught flows
@@ -151,6 +169,14 @@ export default function App() {
         </header>
 
         <WebmcpBanner />
+        <GuidedDock />
+
+        {seeding && (
+          <p className="detect ok">
+            <IconRead size={16} />
+            <span>Setting up the "{seeding}" state by actually learning the page. One moment.</span>
+          </p>
+        )}
 
         {path === "/site" ? (
           <SiteApp />
@@ -274,6 +300,8 @@ function Onboarding() {
           </a>
         </div>
       </section>
+
+      <GuidedPanel />
 
       <h2 className="section-head">
         <IconRead size={17} /> How it works
@@ -400,6 +428,109 @@ function Onboarding() {
         </div>
       )}
     </main>
+  )
+}
+
+/**
+ * Hands-free run of the whole story. Every beat is a real tool call against
+ * real storage, so this is a demo of the system rather than a video of it. The
+ * approval dialog still belongs to the human, which is why the script visibly
+ * waits for it.
+ */
+function useGuided() {
+  const [g, setG] = useState(getGuided)
+  useEffect(() => subscribeGuided(() => setG(getGuided())), [])
+  return g
+}
+
+/** The pitch and the start button, inline on the get-started page. */
+function GuidedPanel() {
+  const g = useGuided()
+  return (
+    <section className={"guided" + (g.running ? " running" : "")}>
+      <div className="guided-head">
+        <div>
+          <b>Watch the whole thing run</b>
+          <span>
+            Nine beats, about forty seconds. Every one is a real tool call, not a recording. You still approve each
+            submit, which is why it stops and waits for you twice.
+          </span>
+        </div>
+        <div className="row">
+          <button className="primary big" onClick={() => void runGuidedDemo()} disabled={g.running}>
+            <IconRun size={17} />
+            {g.running ? "Running..." : g.finishedAt ? "Run it again" : "Run the guided demo"}
+          </button>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/**
+ * Sticky, and rendered outside the router, because the run navigates to the
+ * demo site and back. An inline panel would unmount exactly when the beats
+ * start getting interesting.
+ */
+function GuidedDock() {
+  const g = useGuided()
+  if (!g.running && !g.finishedAt) return null
+
+  const done = g.beats.filter((b) => b.state === "done").length
+  const failed = g.beats.some((b) => b.state === "failed")
+  const active = g.beats.find((b) => b.state === "active")
+
+  return (
+    <section className={"dock" + (g.running ? " running" : "")} aria-live="polite">
+      <div className="dock-head">
+        <b>
+          {g.running ? (
+            <>
+              <span className="spin" /> {active ? active.title : "Running"}
+            </>
+          ) : failed ? (
+            <>
+              <IconAlert size={15} /> Run stopped early
+            </>
+          ) : (
+            <>
+              <IconCheck size={15} /> All {done} beats green
+            </>
+          )}
+        </b>
+        <span className="dock-count">{done}/{g.beats.length}</span>
+        {!g.running && (
+          <button className="link" onClick={resetGuided}>
+            <IconUndo size={14} /> clear
+          </button>
+        )}
+      </div>
+
+      <ol className="beats">
+        {g.beats.map((b) => (
+          <li key={b.id} className={b.state}>
+            <span className="bt">
+              {b.state === "done" ? (
+                <IconCheck size={13} />
+              ) : b.state === "failed" ? (
+                <IconAlert size={13} />
+              ) : b.state === "active" ? (
+                <span className="spin" />
+              ) : null}
+            </span>
+            <span className="bl">{b.title}</span>
+            <span className="bd">{b.result ?? b.detail}</span>
+          </li>
+        ))}
+      </ol>
+
+      {g.awaitingApproval && (
+        <p className="guided-wait">
+          <IconAlert size={15} />
+          <span>Waiting for you. The script cannot get past the approval dialog.</span>
+        </p>
+      )}
+    </section>
   )
 }
 
