@@ -3,7 +3,7 @@
 **Live:** https://yolo-learn.vercel.app
 **Repo:** https://github.com/Hotragn/yolo-learn (public, MIT)
 
-`npm test` (328 tests), `npm run typecheck`, `npm run build` - all green. Browser
+`npm test` (335 tests), `npm run typecheck`, `npm run build` - all green. Browser
 QA driven through a headless Chromium against the dev server, the local
 production build (`vite preview`), and the live Vercel deployment.
 
@@ -650,7 +650,49 @@ phrasing too.
 | URL encoding | A target containing `?` and `&` yields exactly one query parameter |
 | Naming is stable and registry-safe | Same origin, same name; `^[a-z0-9_]+$`; 64 cap held with a 200-character host |
 
-## 18. Limitations - what is NOT verified
+## 18. The sanitizer
+
+The security boundary for the most sensitive input this app accepts: HTML
+captured from a tab the user is signed in to. It had no tests of its own, only
+indirect cover. 28 added, and they found two ways a person's data survived it.
+
+### A PIN field with underscores was read
+
+`pin` never matched `one_time_pin`, because `_` is a word character, so
+there is no boundary in front of `pin`. `atm_pin` and `card_pin` are the same.
+The pattern now uses explicit non-alphanumeric lookarounds, which catch those
+while still refusing `pineapple`, `spinning` and `shipping`.
+
+### A value containing ">" was not stripped
+
+Attributes were matched with `[^>]*`, which ends at the first ">" wherever it
+appears. A quoted value like `value="<b>Real Person</b>"` therefore truncated
+the match, and the rest of the tag, name included, stayed in the output as
+text. That is legal HTML and precisely what a free-text bio on a signed-in page
+looks like. Matching is quote-aware now, consuming quoted runs whole before
+accepting a closing ">", and the same fix was applied to the textarea and
+option matchers, which had the identical flaw.
+
+### What the suite pins
+
+Both halves of the contract, on one document carrying every category at once: a
+name, an email, a password, a card number, a CSRF token, a private note in a
+textarea, a selected option, a checked box and a script with bootstrapped user
+state.
+
+| Half | Verified |
+| --- | --- |
+| Nothing personal survives | All seven planted secrets absent. Credential and payment controls removed entirely, not merely blanked. Hidden inputs gone. Textarea emptied. `checked` and `selected` dropped. Scripts removed |
+| The shape survives | Form, control names, `required` flags and labels all intact, and `readFormFromHTML` still reads the same task afterwards, with no password or card field reaching the reader |
+
+Also pinned: unquoted attributes, spaces around `=`, uppercase tags, single
+quotes, attribute order, self-closing inputs, values containing markup,
+idempotence, and five kinds of malformed markup that must not throw.
+
+Deliberately kept: an `<option value>` stays, because that is the site's
+vocabulary rather than the user's data. Only the selection is removed.
+
+## 19. Limitations - what is NOT verified
 
 Rewritten after the restore, because the previous version had gone stale and
 contradicted three sections of this same document. It claimed the ChatGPT

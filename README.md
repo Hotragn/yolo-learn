@@ -15,7 +15,7 @@
   <img src="https://img.shields.io/badge/WebMCP-registerTool-7BD40A?style=flat-square&labelColor=0B1220" alt="WebMCP">
   <img src="https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript">
   <img src="https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=0B1220" alt="React">
-  <img src="https://img.shields.io/badge/tests-328-passing-7BD40A?style=flat-square&labelColor=0B1220" alt="328 tests">
+  <img src="https://img.shields.io/badge/tests-335-passing-7BD40A?style=flat-square&labelColor=0B1220" alt="335 tests">
   <img src="https://img.shields.io/badge/license-MIT-0B1220?style=flat-square" alt="MIT">
 </p>
 
@@ -50,7 +50,7 @@ Not claims. Numbers, each reproducible from the live site.
 | **Agreement with W3C on W3C's own pages** | **44 findings to 3.** High 8 to 0, medium 33 to 0 | Audit the WAI before/after pair; nobody here wrote either version |
 | **Server-side fetch, SSRF surface** | **14 of 14 vectors blocked**, including `localhost` resolving to `::1` and the cloud metadata IP | `node ssrf-check.mjs` |
 | **A run interrupted by a page teardown** | Resumes at the step it reached, approval gate intact | Start a run, hard-reload mid-flight |
-| **Tests** | 328, including one that reproduces a real ChatGPT invocation crash | `npm test` |
+| **Tests** | 335, including one that reproduces a real ChatGPT invocation crash | `npm test` |
 
 Every number above is worked through in **[VERIFICATION.md](VERIFICATION.md)**,
 including what is *not* verified. The ChatGPT session that found a real bug in

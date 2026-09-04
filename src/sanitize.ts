@@ -23,11 +23,32 @@
 export const SENSITIVE_AUTOCOMPLETE =
   /^(current-password|new-password|one-time-code|cc-name|cc-number|cc-exp|cc-exp-month|cc-exp-year|cc-csc|cc-type)/i
 
-/** Field names that mean a credential or a national identifier, however spelled. */
+/**
+ * Field names that mean a credential or a national identifier, however spelled.
+ *
+ * `pin` uses an explicit non-alphanumeric boundary rather than `\b`, because
+ * `_` is a word character: `\bpin\b` does not match `one_time_pin` or
+ * `atm_pin`, which is exactly how such a field gets named. The lookarounds
+ * still refuse `pineapple` and `spinning`.
+ */
 export const SENSITIVE_NAME =
-  /(password|passwd|pwd|passcode|cvv|cvc|csc|card.?num|cardnumber|ccnum|ssn|social.?security|sort.?code|iban|routing|secret|token|otp|mfa|2fa|\bpin\b|security.?(code|answer)|auth)/i
+  /(password|passwd|pwd|passcode|cvv|cvc|csc|card.?num|cardnumber|ccnum|ssn|social.?security|sort.?code|iban|routing|secret|token|otp|mfa|2fa|(?<![a-z0-9])pin(?![a-z0-9])|security.?(code|answer)|auth)/i
 
-const TAG_WITH_ATTRS = /<(input|textarea|select|button)\b([^>]*)>/gi
+/**
+ * An attribute run, quote-aware.
+ *
+ * `[^>]*` looks correct and is not: a ">" inside a quoted value ends the match
+ * early, so `value="<b>Real Person</b>"` truncated the tag and left the name
+ * behind in the output as text. That is legal HTML and precisely what a bio
+ * field on a signed-in page contains. This consumes quoted runs whole before
+ * it will accept a closing ">".
+ */
+const ATTRS = `(?:"[^"]*"|'[^']*'|[^>"'])*`
+
+const TAG_WITH_ATTRS = new RegExp(`<(input|textarea|select|button)\\b(${ATTRS})>`, "gi")
+const TEXTAREA_BODY = new RegExp(`(<textarea\\b${ATTRS}>)[\\s\\S]*?(</textarea\\s*>)`, "gi")
+const OPTION_TAG = new RegExp(`<option\\b(${ATTRS})>`, "gi")
+
 const ATTR = (name: string) => new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'>]+))`, "i")
 
 function attrValue(attrs: string, name: string): string {
@@ -60,6 +81,14 @@ function dropValues(attrs: string): string {
     .replace(/\s{2,}/g, " ")
 }
 
+/**
+ * An option's `value` is part of the site's vocabulary rather than the user's
+ * data, so it stays; only the selection is removed.
+ */
+function dropValuesKeepOption(attrs: string): string {
+  return attrs.replace(/\bselected(\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'>]+))?/gi, "").replace(/\s{2,}/g, " ")
+}
+
 export function stripSensitiveMarkup(html: string): string {
   if (!html) return ""
 
@@ -69,23 +98,15 @@ export function stripSensitiveMarkup(html: string): string {
     .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, "")
     .replace(/<script\b[^>]*\/?>/gi, "")
     // Textarea content is, by definition, something a person typed.
-    .replace(/(<textarea\b[^>]*>)[\s\S]*?(<\/textarea\s*>)/gi, "$1$2")
+    .replace(TEXTAREA_BODY, "$1$2")
     // Option labels are the site's vocabulary and are wanted; their selected
     // state is the user's choice and is not.
-    .replace(/<option\b([^>]*)>/gi, (_m, attrs: string) => `<option${dropValuesKeepOption(attrs)}>`)
+    .replace(OPTION_TAG, (_m: string, attrs: string) => `<option${dropValuesKeepOption(attrs)}>`)
 
-  out = out.replace(TAG_WITH_ATTRS, (_whole, tag: string, attrs: string) => {
+  out = out.replace(TAG_WITH_ATTRS, (_whole: string, tag: string, attrs: string) => {
     if (attrsAreSensitive(attrs)) return ""
     return `<${tag}${dropValues(attrs)}>`
   })
 
   return out
-}
-
-/**
- * An option's `value` is part of the site's vocabulary rather than the user's
- * data, so it stays; only the selection is removed.
- */
-function dropValuesKeepOption(attrs: string): string {
-  return attrs.replace(/\bselected(\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'>]+))?/gi, "").replace(/\s{2,}/g, " ")
 }
