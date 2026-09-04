@@ -1,0 +1,73 @@
+<!doctype html>
+<meta charset="utf-8">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:1200px; height:630px; }
+  body {
+    background:
+      radial-gradient(680px 420px at 92% -12%, rgba(123,212,10,.16), transparent 62%),
+      linear-gradient(#0d1523, #0a1120);
+    font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+    color:#eef2f7;
+    position:relative;
+    overflow:hidden;
+  }
+  /* faint grid, same as the old card */
+  body::before {
+    content:""; position:absolute; inset:0;
+    background-image:
+      linear-gradient(rgba(255,255,255,.028) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.028) 1px, transparent 1px);
+    background-size:60px 60px;
+  }
+  .wrap { position:relative; padding:60px 72px; height:100%; display:flex; flex-direction:column; }
+  .brand { display:flex; align-items:center; gap:18px; }
+  .brand .name { font-size:30px; font-weight:700; letter-spacing:-.01em; }
+  .brand .name span { color:#8d98a8; font-weight:600; }
+  .eyebrow {
+    margin-top:44px; font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+    font-size:15px; letter-spacing:.20em; color:#7bd40a;
+  }
+  h1 {
+    margin-top:18px; font-size:57px; line-height:1.08;
+    letter-spacing:-.032em; font-weight:700; max-width:19.5ch;
+  }
+  h1 em { font-style:normal; color:#7bd40a; }
+  .sub { margin-top:22px; font-size:21px; line-height:1.5; color:#aab4c2; max-width:52ch; }
+  .pills { margin-top:auto; display:flex; align-items:center; gap:14px; }
+  .pill {
+    font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+    font-size:15px; padding:11px 20px; border-radius:999px; white-space:nowrap;
+  }
+  .pill.solid { background:#7bd40a; color:#0a1120; font-weight:600; }
+  .pill.ghost { border:1px solid #2c3849; color:#c3ccd8; }
+  .url {
+    margin-left:auto; font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+    font-size:17px; color:#78849a;
+  }
+</style>
+<div class="wrap">
+  <div class="brand">
+    <!-- current mark from src/icons.tsx, not the old circle-check -->
+    <svg width="52" height="52" viewBox="0 0 32 32" fill="none">
+      <rect width="32" height="32" rx="8.5" fill="#182233"/>
+      <g stroke="#F4F6F9" stroke-width="2.2" stroke-linecap="round" opacity="0.45">
+        <path d="M8.5 12h9"/><path d="M8.5 19.5h5"/>
+      </g>
+      <path d="M8.5 23.5c7 0 6-11 15-11" stroke="#FAFAF8" stroke-width="2.9" stroke-linecap="round"/>
+      <circle cx="23.5" cy="12.5" r="2.4" fill="#7bd40a"/>
+    </svg>
+    <div class="name">Yolo <span>Learn</span></div>
+  </div>
+
+  <div class="eyebrow">OPENAI WEBMCP CHALLENGE</div>
+  <h1>It learns a website by itself, and <em>heals</em> when the site changes.</h1>
+  <div class="sub">Reads the page, mints a WebMCP tool mid-session,<br>and survives the redesign with one question.</div>
+
+  <div class="pills">
+    <div class="pill solid">no demonstration</div>
+    <div class="pill ghost">deterministic healing</div>
+    <div class="pill ghost">you approve every submit</div>
+    <div class="url">yolo-learn.vercel.app</div>
+  </div>
+</div>

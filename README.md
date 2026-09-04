@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/og.png" alt="Yolo Learn" width="720">
+  <img src="public/og.png" alt="Yolo Learn: it learns a website by itself, and heals when the site changes" width="820">
 </p>
 
 <h1 align="center">Yolo Learn</h1>
@@ -84,10 +84,10 @@ Keyed on origin + fingerprint of step intents and field purposes, not on headlin
 ## Demo (video)
 
 <p align="center">
-  <img src="docs/demo.gif" alt="Learn, mint, run, redesign, heal" width="720">
+  <img src="docs/demo.gif" alt="An agent asks approval to submit, the clinic is redesigned, and the flow heals itself" width="820">
 </p>
 
-<p align="center"><sub>Real tool calls, not a mock. You still approve each submit. For Devpost, upload this loop to YouTube (under 3 minutes, with audio).</sub></p>
+<p align="center"><sub>Approve a submit, watch the site get redesigned underneath it, and see the four changes it found: three heal from the page, one needs an answer. Real tool calls, not a mock.</sub></p>
 
 [Just learned](https://yolo-learn.vercel.app/#/?demo=learned) · [Drifted](https://yolo-learn.vercel.app/#/?demo=drifted) · [Healed](https://yolo-learn.vercel.app/#/?demo=healed)
 
