@@ -50,7 +50,8 @@ Not claims. Numbers, each reproducible from the live site.
 | **Agreement with W3C on W3C's own pages** | **44 findings to 3.** High 8 to 0, medium 33 to 0 | Audit the WAI before/after pair; nobody here wrote either version |
 | **Server-side fetch, SSRF surface** | **14 of 14 vectors blocked**, including `localhost` resolving to `::1` and the cloud metadata IP | `node ssrf-check.mjs` |
 | **A run interrupted by a page teardown** | Resumes at the step it reached, approval gate intact | Start a run, hard-reload mid-flight |
-| **Tests** | 335, including one that reproduces a real ChatGPT invocation crash | `npm test` |
+| **Signed-in page snapshot** | **Nothing personal stored, and the task still reads.** Seven planted secrets absent; form, names and `required` flags intact | `npm test -- sanitize` |
+| **Tests** | 335. Seven live defects found by tests written against new code, not by luck | `npm test` |
 
 Every number above is worked through in **[VERIFICATION.md](VERIFICATION.md)**,
 including what is *not* verified. The ChatGPT session that found a real bug in
