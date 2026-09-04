@@ -96,3 +96,34 @@ survived a redesign with exactly one question.
 Judged on robustness, it was a failure that looked like a pass, and it took a
 real implementation to reveal it. The tool list rendering perfectly is exactly
 what made it hard to notice.
+
+---
+
+## Second session, 4 September 2026: the fix verified, and a new finding
+
+Re-run against the deployed app after the invocation fix.
+
+**The crash is gone.** `list_flows` returned a full JSON payload where every
+call previously threw `Cannot read properties of undefined (reading 'aborted')`
+before the tool body ran. Verified against the implementation that broke it,
+not against a reproduction of it.
+
+**Tool choice held up with a larger surface.** Asked what the page remembered
+about wikipedia.org "without fetching anything", it chose `recall_url` over
+`learn_url` from fourteen tools and volunteered "No page fetch was performed."
+
+**New finding: it skipped recall and learned a duplicate.** Asked to learn the
+page and run the flow, it called `learn_site` directly and produced
+`clinic_booking_2`, a second copy of a flow that was already healed, healthy
+and had run twice. `recall_page` exists precisely to prevent this and its
+description says "call this FIRST on any page, before learn_site".
+
+The lesson is the same one the first session taught in a different key: a
+description is advice, and an agent may decline advice. `learn_site` now checks
+recall itself and returns the existing flow on a hit, or points at healing when
+the page has drifted, with `force` as the deliberate escape hatch. Six tests
+pin exactly the sequence that went wrong.
+
+Not a bug: it then asked for an insurance ID. The site was on v2.0, so a freshly
+learned flow genuinely has that field required with no stored value, and it
+refused to invent one. That is the designed behaviour working.

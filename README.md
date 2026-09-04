@@ -15,7 +15,7 @@
   <img src="https://img.shields.io/badge/WebMCP-registerTool-7BD40A?style=flat-square&labelColor=0B1220" alt="WebMCP">
   <img src="https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript">
   <img src="https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=0B1220" alt="React">
-  <img src="https://img.shields.io/badge/tests-335-passing-7BD40A?style=flat-square&labelColor=0B1220" alt="335 tests">
+  <img src="https://img.shields.io/badge/tests-341-passing-7BD40A?style=flat-square&labelColor=0B1220" alt="341 tests">
   <img src="https://img.shields.io/badge/license-MIT-0B1220?style=flat-square" alt="MIT">
 </p>
 
@@ -51,7 +51,7 @@ Not claims. Numbers, each reproducible from the live site.
 | **Server-side fetch, SSRF surface** | **14 of 14 vectors blocked**, including `localhost` resolving to `::1` and the cloud metadata IP | `node ssrf-check.mjs` |
 | **A run interrupted by a page teardown** | Resumes at the step it reached, approval gate intact | Start a run, hard-reload mid-flight |
 | **Signed-in page snapshot** | **Nothing personal stored, and the task still reads.** Seven planted secrets absent; form, names and `required` flags intact | `npm test -- sanitize` |
-| **Tests** | 335. Seven live defects found by tests written against new code, not by luck | `npm test` |
+| **Tests** | 341. Eight live defects found by tests written against new code, not by luck | `npm test` |
 
 Every number above is worked through in **[VERIFICATION.md](VERIFICATION.md)**,
 including what is *not* verified. The ChatGPT session that found a real bug in

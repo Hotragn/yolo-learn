@@ -844,13 +844,60 @@ export async function registerStaticTools(): Promise<void> {
       "Learn the task on the current page autonomously, with no human demonstration. Reads the form the way a " +
       "screen reader would - labels, field names, required flags, option lists - walks the wizard with throwaway " +
       "values, and mints a tool for what it found. Every field it discovers becomes a parameter you supply at call " +
-      "time; it never invents a person's details. Use this first on a site the user has not taught. It will not " +
-      "press a button unless that button clearly means \"next\", so it cannot submit anything.",
-    inputSchema: { type: "object", properties: {} },
+      "time; it never invents a person's details. It will not press a button unless that button clearly means " +
+      "\"next\", so it cannot submit anything. Safe to call on a page that is already known: it checks first and " +
+      "returns the existing flow rather than learning a duplicate. Pass force to re-read deliberately.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        force: {
+          type: "boolean",
+          description: "Re-read even if this page is already known, instead of returning what is stored",
+        },
+      },
+    },
     annotations: { readOnlyHint: false, untrustedContentHint: true },
-    execute: async (_args, { signal }) => {
+    execute: async (args, { signal }) => {
       const bad = aborted(signal)
       if (bad) return bad
+
+      // A real agent skipped recall_page and learned a second copy of a site
+      // it already knew, healed and healthy. Relying on a description to say
+      // "call this other tool first" does not hold, so the guard belongs here
+      // where it cannot be skipped.
+      if (args.force !== true) {
+        const { recallForPage } = await import("./recall")
+        const recalled = recallForPage()
+
+        if (recalled.state === "hit") {
+          const fresh = recalled.flows.find((f) => f.state === "fresh") ?? recalled.flows[0]
+          return {
+            summary:
+              `Already known, so nothing was read. "${fresh?.name}" still matches this page ` +
+              `(fingerprint ${recalled.fingerprint}). Run it, or pass force to re-read anyway.`,
+            learned: false,
+            reason: "already known and unchanged",
+            toolName: fresh?.name,
+            flowId: fresh?.id,
+            fingerprint: recalled.fingerprint,
+            nextStep: recalled.nextStep,
+          }
+        }
+
+        if (recalled.state === "stale") {
+          return {
+            summary:
+              `This page is already known but has changed. Heal the existing flow rather than learning a ` +
+              `second copy of it: ${recalled.summary}`,
+            learned: false,
+            reason: "already known but drifted",
+            flows: recalled.flows,
+            fingerprint: recalled.fingerprint,
+            nextStep: recalled.nextStep,
+          }
+        }
+      }
+
       // Imported lazily: learn.ts needs mintFlowTool from this module, and a
       // dynamic import keeps that cycle out of the module graph.
       const { learnCurrentSite } = await import("./learn")
